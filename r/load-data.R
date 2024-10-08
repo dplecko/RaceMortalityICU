@@ -1,8 +1,8 @@
 
-load_data <- function(src, quick = FALSE) {
+load_data <- function(src, outcome = "death", quick = FALSE) {
   
   root <- rprojroot::find_root(rprojroot::has_file(".gitignore"))
-  fl_path <- file.path(root, "data", paste0("dat-", src, ".RData"))
+  fl_path <- file.path(root, "data", paste0("dat-", src, "-", outcome, ".RData"))
   if (file.exists(fl_path)) {
   
     load(fl_path)     
@@ -11,26 +11,45 @@ load_data <- function(src, quick = FALSE) {
   
   if (src == "anzics") {
     
-    sel_coh <- load_concepts(c("adm_episode", "age", "adm_year"), "anzics", 
-                             verbose = FALSE)
-    patient_ids <- id_col(sel_coh[adm_episode %in% c(0, 1) & age >= 18 &
-                                  adm_year >= 2018])
+    sel_coh <- load_concepts(c("adm_episode", "hosp_episode", "age", "adm_year", 
+                               "death"), "anzics", verbose = FALSE)
+    
+    if (outcome == "death") {
+      
+      patient_ids <- id_col(sel_coh[adm_episode %in% c(0, 1) & age >= 18 &
+                                      adm_year >= 2018])
+      
+    } else if (outcome == "readm") {
+      
+      patient_ids <- id_col(
+        sel_coh[(adm_episode %in% c(0, 1)) & (hosp_episode %in% c(0, 1)) & 
+                age >= 18 & adm_year >= 2018 & (death != TRUE)]
+      )
+      
+      readm <- sel_coh[, c(meta_vars(sel_coh), "hosp_episode"), with = FALSE]
+    }
     
     dat <- load_concepts(c("death", "age", "country", "apache_iii_rod", 
                            "apache_iii_diag", "sex", "indig", "elective", 
                            "adm_diag"), "anzics", 
                          patient_ids = patient_ids, verbose = FALSE)
     
+    if (outcome == "readm") {
+      
+      dat <- merge(dat, readm, all.x = TRUE)
+    }
+    
     dat[, sex := as.integer(sex == "Male")]
     dat[, majority := 1 - indig]
-    dat[, indig := NULL]
-    dat[, c(index_var(dat)) := NULL]
+    dat[, readm := hosp_episode]
+    
+    dat[, c(index_var(dat), "indig", "hosp_episode") := NULL]
     imp_lst <- list(
       age = 65,
       apache_iii_rod = median(dat$apache_iii_rod, na.rm = TRUE),
       death = FALSE,
       apache_iii_diag = 0,
-      indig = NA,
+      majority = NA,
       elective = NA,
       sex = NA,
       adm_diag = "OTH"
@@ -54,7 +73,7 @@ load_data <- function(src, quick = FALSE) {
     attr(dat, "X") <- c("apache_iii_rod", "apache_iii_diag", "age", "sex", 
                         "elective")
     attr(dat, "W") <- "majority"
-    attr(dat, "Y") <- "death"
+    attr(dat, "Y") <- outcome
     attr(dat, "diag_col") <- "apache_iii_diag"
     attr(dat, "diag_dt") <- diag_dt
   } else if (src == "miiv") {

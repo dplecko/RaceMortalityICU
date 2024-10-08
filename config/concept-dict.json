@@ -1,0 +1,44 @@
+{
+  "hosp_episode": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "PatientID",
+          "add_var": "AdmEpisode",
+          "year_var": "IcuAdmitYYYY",
+          "site_var": "SiteID",
+          "adm_var": "ICU_AD_DTM",
+          "class": "col_itm",
+          "callback": "anzics_hosp_epi_cb"
+        }
+      ]
+    }
+  },
+  "POA": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "POA",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "irsad": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "POA",
+          "class": "col_itm",
+          "callback": "anzics_irsad_cb"
+        }
+      ]
+    }
+  }
+}

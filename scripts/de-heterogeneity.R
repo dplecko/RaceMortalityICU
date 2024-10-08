@@ -5,8 +5,10 @@ set.seed(2024)
 
 #' * Heterogeneity of (z, w)-DE_{x_0, x_1} * 
 src <- "anzics"
-dat <- load_data(src)
+outcome <- "readm"
 nz_only <- FALSE
+fl_path <- file.path(root, "data", paste0("de-crf-", outcome, ".RData"))
+dat <- load_data(src, outcome = outcome)
 
 if (nz_only) {
   
@@ -23,16 +25,10 @@ diag_col <- attr(dat, "diag_col")
 attr(dat, "X") <- attr(dat, "W") <- attr(dat, "Y") <- 
   attr(dat, "diag_dt") <- attr(dat, "diag_col") <- NULL
 
-if (src == "anzics" & file.exists(file.path(root, "data", "de_crf.RData"))) {
-  
-  load(file.path(root, "data", "de_crf.RData"))
-} else {
+if (src == "anzics" & file.exists(fl_path)) load(fl_path) else {
   
   de_crf <- boot_crf(data = dat, X = X, W = W, Y = Y)
-  if (src == "anzics") {
-    
-    save(de_crf, file = file.path(root, "data", "de_crf.RData"))
-  }
+  if (src == "anzics") save(de_crf, file = fl_path)
 }
 
 dat <- dat[, de_mean := rowMeans(de_crf, na.rm = TRUE)]

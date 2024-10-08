@@ -1,5 +1,5 @@
 
-ricu::init_proj()
+ricu:::init_proj()
 
 scripts <- c(
   "tv-decompositions.R", # Figure 2(b)

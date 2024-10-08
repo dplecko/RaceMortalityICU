@@ -2,6 +2,7 @@
 ricu:::init_proj()
 
 derr_plts <- list()
+outcome <- "death"
 
 for (country in c("AU", "NZ")) {
 
@@ -39,12 +40,12 @@ for (country in c("AU", "NZ")) {
   res <- ts_risk[, list(rr = risk[majority == 0] / risk[majority == 1]), 
                  by = c("diag_grp")]
   res <- setnames(res, "diag_grp", "apache_iii_diag")
-  # bring in the causal forest info
   
+  # bring in the causal forest info
   src <- "anzics"
-  dat <- load_data(src)
+  dat <- load_data(src, outcome = outcome)
   root <- rprojroot::find_root(rprojroot::has_file(".gitignore"))
-  load(file.path(root, "data", "de_crf.RData"))
+  load(file.path(root, "data", paste0("de-crf-", outcome, ".RData")))
   
   dat <- dat[, de_mean := rowMeans(de_crf, na.rm = TRUE)]
   dat <- if (country == "AU") dat[country == "AU"] else dat[country == "NZ"]
@@ -53,21 +54,29 @@ for (country in c("AU", "NZ")) {
     res, dat[, list(de_avg = mean(de_mean), .N), by = "apache_iii_diag"],
     by = "apache_iii_diag"
   )
+  
+  res[, Admission := ifelse(apache_iii_diag >= 1200, "Surgical", "Medical")]
+  # res <- res[Admission == "Medical"]
+  
   lmod <- lm(de_avg ~ rr, data = res[!is.infinite(rr)], 
              weights = res[!is.infinite(rr)]$N)
   cat("--- Country =", country, "---\n")
   print(summary(lmod))
   derr_plts[[country]] <- ggplot(
-    res[!is.infinite(rr)], aes(x = rr, y = de_avg, size = N)) +
-    geom_point(show.legend = FALSE) + theme_bw() +
+    res[!is.infinite(rr)], aes(x = rr, y = de_avg, size = N, color = Admission)) +
+    geom_point() + theme_bw() +
     geom_abline(intercept = coef(lmod)[1], slope = coef(lmod)[2],
                 color = "red", linewidth = 1.2) +
     xlab("Risk ratio for ICU admission") +
     ylab("Diagnosis-specific Direct Effect") +
     scale_y_continuous(labels = scales::percent) +
     ggtitle(ifelse(country == "AU", "Australia", "New Zealand")) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 18))
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+          legend.position = "inside", legend.position.inside = c(0.7, 0.7),
+          legend.box.background = element_rect()) +
+    guides(size = "none")
 }
 
 cowplot::plot_grid(plotlist = derr_plts, labels = c("(A)", "(B)"), ncol = 2L)
-ggsave(file.path(root, "results", "de-rr.png"), width = 12, height = 4)
+ggsave(file.path(root, "results", paste0("de-rr-", outcome, ".png")), 
+       width = 12, height = 4)

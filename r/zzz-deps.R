@@ -1,4 +1,5 @@
 
+Sys.setenv(RICU_CONFIG_PATH = "~/ICU/race-and-mortality/config")
 library(ricu)
 library(ggplot2)
 library(ggrepel)
@@ -13,3 +14,4 @@ library(magrittr)
 library(officer)
 library(assertthat)
 library(plyr)
+

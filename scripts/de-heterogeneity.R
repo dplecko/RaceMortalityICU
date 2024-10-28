@@ -5,7 +5,7 @@ set.seed(2024)
 
 #' * Heterogeneity of (z, w)-DE_{x_0, x_1} * 
 src <- "anzics"
-outcome <- "readm"
+outcome <- "death"
 nz_only <- FALSE
 fl_path <- file.path(root, "data", paste0("de-crf-", outcome, ".RData"))
 dat <- load_data(src, outcome = outcome)
@@ -41,6 +41,8 @@ mean_dt <- dat[, list(mean_X = mean(de_mean), var_X = mean(de_var)),
                by = c("age_group", "diag_group")]
 mean_dt[, mean_X := trim_ends(mean_X, 0.02)]
 mean_dt[, p_val := pnorm(abs(mean_X/sqrt(var_X)), lower.tail = FALSE)]
+mean_dt[, age_group := gsub(" years", "", age_group)]
+
 ggplot(mean_dt[diag_group != "Other"], 
        aes(x = diag_group, y = age_group, fill = mean_X, alpha = 1 - p_val)) +
   geom_tile() +
@@ -50,21 +52,11 @@ ggplot(mean_dt[diag_group != "Other"],
   geom_text(aes(label = paste0(round(mean_X * 100, 1), "%")), 
             color = "black", size = 3) +
   guides(alpha = "none") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.9, hjust=1)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.9, hjust=1, size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 13)) +
   geom_vline(xintercept = 4.5, color = "red") +
-  ylab("Age group") + xlab("Diagnosis group")
+  ylab("Age group (years)") + xlab("Diagnosis group")
 
 ggsave(paste0("results/de-heterogeneity-", src, ".png"), width = 10, height = 7, 
        bg = "white")
-
-# additional extended plot for the supplements
-# if (src == "anzics") {
-#   # make additional plot
-# }
-# investigate the behavior of extreme weights
-# load("results/pw-dt.RData")
-# dat <- merge(dat, pw_dt, all.x = TRUE)
-# ggplot(
-#   aes(x = de_var, y = -log(pw)), data = dat[complete.cases(dat)]
-# ) +
-#   geom_point(size = 0.05) + theme_bw()

@@ -1,27 +1,26 @@
 
 ricu:::init_proj()
 
-# 
-
 iice_radar <- function(lvl = "SA3") {
   
+  age_adjust <- TRUE
   # pull in the information on patients at risk
   pop_dat <- at_risk(lvl)
   
   # pull in the data on patients admitted
   dat <- pop_and_dat("AU")[["dat"]]
   dat <- dat[year == 2021]
-  poa_dat <- load_concepts("POA", "anzics")
+  poa_dat <- load_concepts("postcode", "anzics")
   dat <- merge(dat, poa_dat, all.x = TRUE)
   
   # pull in the data on merging areas
-  crs <- sa_coarsening(area_map(), "POA", lvl)
+  crs <- sa_coarsening(area_map(), "postcode", lvl)
   crs$area <- seq_len(nrow(crs))
   
   # get the area indicator to both pop_dat and dat
   poa_area <- do.call(
     rbind, Map(
-      function(x, y) data.table(POA = x, area = y),
+      function(x, y) data.table(postcode = x, area = y),
       crs$coarse, crs$area
     )
   )
@@ -36,14 +35,14 @@ iice_radar <- function(lvl = "SA3") {
   
   # merge areas into pop_dat, dat
   pop_dat <- merge(pop_dat, lvl_area, by = lvl)
-  dat <- merge(dat, poa_area, by = "POA", all.x = TRUE)
+  dat <- merge(dat, poa_area, by = "postcode", all.x = TRUE)
   
   if (sum(is.na(dat$area)) > 0) {
     
     cat("Some areas not mapped. Check.\n")
     dat <- dat[complete.cases(dat)]
   }
-  
+
   # get risks by age group -> exists
   # get age-adjusted risk ratio -> exists
   ts_risk <- as.data.table(
@@ -76,7 +75,7 @@ iice_radar <- function(lvl = "SA3") {
   } else {
     # pooled estimate
     ts_risk <- ts_risk[, list(risk = sum(N) / sum(V1)), 
-                       by = c("area", "diag_grp", "majority")]
+                       by = c("area", "majority")]
   }
   
   ts_rr <- merge(

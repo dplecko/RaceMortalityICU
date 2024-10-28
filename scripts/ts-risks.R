@@ -4,7 +4,7 @@ ricu:::init_proj()
 # interpolate and process the census data
 intrvl <- c(2018, 2022)
 
-ts_risk <- function(country, boot = 1) {
+ts_risk <- function(country, boot = 1, split_elective = TRUE) {
   
   age_adjust <- TRUE
   c(pop_dat, dat) %<-% pop_and_dat(country)
@@ -14,15 +14,24 @@ ts_risk <- function(country, boot = 1) {
     boot_idx <- sample(nrow(dat), replace = TRUE)
     dat <- dat[boot_idx]
   }
+  
+  # massage the diag_grp
+  dat[, diag_grp_el := diag_grp]
+  
+  if (split_elective) {
     
+    dat[diag_grp >= 12, diag_grp_el := diag_grp_el + 100 * elective]
+  }
+  
+  
   # get a table
   ts_risk <- as.data.table(
-    expand.grid(age = unique(dat$age), diag_grp = unique(dat$diag_grp),
+    expand.grid(age = unique(dat$age), diag_grp_el = unique(dat$diag_grp_el),
                 majority = c(0, 1), year = unique(dat$year))
   )
   
   ts_risk <- merge(
-    ts_risk, dat[, .N, by = c("age", "diag_grp", "majority", "year")],
+    ts_risk, dat[, .N, by = c("age", "diag_grp_el", "majority", "year")],
     all.x = TRUE
   )
   ts_risk[is.na(N), N := 0]
@@ -48,22 +57,37 @@ ts_risk <- function(country, boot = 1) {
     ts_risk[, risk := N / V1]
     
     ts_risk <- ts_risk[, list(risk = sum(risk * wgh) / sum(wgh)), 
-                       by = c("year", "majority", "diag_grp")] 
+                       by = c("year", "majority", "diag_grp_el")] 
   } else {
     # pooled estimate
     ts_risk <- ts_risk[, list(risk = sum(N) / sum(V1)), 
-                       by = c("year", "diag_grp", "majority")]
+                       by = c("year", "diag_grp_el", "majority")]
   }
-  
+
   ts_rr <- merge(
-    ts_risk[majority == 0, c("year", "diag_grp", "risk"), with=FALSE],
-    ts_risk[majority == 1, c("year", "diag_grp", "risk"), with=FALSE],
-    by = c("year", "diag_grp")
+    ts_risk[majority == 0, c("year", "diag_grp_el", "risk"), with=FALSE],
+    ts_risk[majority == 1, c("year", "diag_grp_el", "risk"), with=FALSE],
+    by = c("year", "diag_grp_el")
   )
   
   ts_rr[, rr := risk.x / risk.y]
+  ts_rr[, diag_grp := diag_grp_el]
+  if (split_elective) {
+  
+    ts_rr[diag_grp_el > 100, diag_grp := diag_grp_el - 100]
+  }
+  
   ts_rr[, diag_name := anz_std_diag(diag_grp)]
-  ts_rr[, diag_grp_name := ifelse(diag_grp <= 11, "Medical", "Surgical")]
+  ts_rr[, diag_grp_name := ifelse(diag_grp_el <= 11, "Medical", "Surgical")]
+  
+  if (split_elective) {
+    
+    ts_rr[diag_grp_el >= 12, 
+          diag_grp_name := ifelse(diag_grp_el > 100, 
+                                  paste(diag_grp_name, "(Elective)"),
+                                  paste(diag_grp_name, "(Non-elective)"))]
+  }
+  
   if (country == "AU") ts_rr[, country := "Australia"] else 
     ts_rr[, country := "New Zealand"]
   

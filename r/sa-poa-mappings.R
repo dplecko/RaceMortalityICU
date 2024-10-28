@@ -89,9 +89,9 @@ area_map <- function() {
                           "SA2_CODE21")
     sa1_seifa <- setnames(sa1_seifa, "2021 Statistical Area Level 1 (SA1) Code", 
                           "SA1_CODE21")
-    sa1_seifa <- setnames(sa1_seifa, "2021 Postal Area (POA) Code", "POA")
+    sa1_seifa <- setnames(sa1_seifa, "2021 Postal Area (POA) Code", "postcode")
     
-    sa1_seifa <- sa1_seifa[, c("SA1_CODE21", "SA2_CODE21", "POA"), with=FALSE]
+    sa1_seifa <- sa1_seifa[, c("SA1_CODE21", "SA2_CODE21", "postcode"), with=FALSE]
     sa1_seifa <- sa1_seifa[complete.cases(sa1_seifa)]
     
     sas <- sf::st_read(file.path(folder, "sa1-shp/sa1-shp.shp"))

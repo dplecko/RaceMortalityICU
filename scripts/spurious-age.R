@@ -1,51 +1,42 @@
 
 ricu:::init_proj()
 
-nz_age <- load_data("anzics")[country == "NZ"]
-aus_age <- load_data("anzics")[country == "AU"]
-us_age <- load_data("miiv", quick = TRUE)[, c("age", "majority"), with = FALSE]
+# Load datasets
+datasets <- list(
+  US = load_data("miiv", quick = TRUE)[, c("age", "majority"), with = FALSE],
+  AU = load_data("anzics")[country == "AU"],
+  NZ = load_data("anzics")[country == "NZ"]
+)
 
-us_age[, mean(age), by = "majority"][, diff(V1)]
-aus_age[, mean(age), by = "majority"][, diff(V1)]
-nz_age[, mean(age), by = "majority"][, diff(V1)]
+# Plot settings for each dataset
+plot_params <- list(
+  US = list(title = "United States", fill_labels = c("African-American", "White")),
+  AU = list(title = "Australia", fill_labels = c("First Nations", "Majority")),
+  NZ = list(title = "New Zealand", fill_labels = c("Māori", "Majority"))
+)
 
-p1 <- ggplot(
-  us_age,
-  aes(x = age, fill = factor(majority))
-) + theme_minimal() + ylab("Probability Density") + xlab("Age") +
-  scale_fill_discrete(name = "Group", labels = c("African-American", "White")) +
-  theme(
-    legend.position = "inside", legend.position.inside = c(0.25, 0.8),
-    legend.box.background = element_rect(),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 18)
-  ) +
-  geom_density(alpha = 0.4) + ggtitle("United States")
+# Create plots using a loop
+plots <- list()
+i <- 1
+for (name in names(datasets)) {
+  data <- datasets[[name]]
+  params <- plot_params[[name]]
+  
+  plots[[i]] <- ggplot(data, aes(x = age, fill = factor(majority))) +
+    theme_minimal() + ylab("Probability Density") + xlab("Age") +
+    scale_fill_discrete(name = "Group", labels = params$fill_labels) +
+    theme(
+      legend.position = "inside", legend.position.inside = c(0.25, 0.8),
+      legend.box.background = element_rect(),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 12)
+    ) +
+    geom_density(alpha = 0.4) + ggtitle(params$title)
+  
+  i <- i + 1
+}
 
-p2 <- ggplot(
-  aus_age,
-  aes(x = age, fill = factor(majority))
-) + theme_minimal() + ylab("Probability Density") + xlab("Age") +
-  theme(
-    legend.position = "inside", legend.position.inside = c(0.25, 0.8),
-    legend.box.background = element_rect(),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 18)
-  ) +
-  geom_density(alpha = 0.4) + 
-  scale_fill_discrete(name = "Group", labels = c("First Nations", "Majority")) +
-  ggtitle("Australia")
-
-p3 <- ggplot(
-  nz_age,
-  aes(x = age, fill = factor(majority))
-) + theme_minimal() + ylab("Probability Density") + xlab("Age") +
-  scale_fill_discrete(name = "Group", labels = c("Māori", "Majority")) +
-  theme(
-    legend.position = "inside", legend.position.inside = c(0.25, 0.8),
-    legend.box.background = element_rect(),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 18)
-  ) +
-  geom_density(alpha = 0.4) +
-  ggtitle("New Zealand")
-
-cowplot::plot_grid(p2, p3, p1, ncol = 3L, labels = c("(A)", "(B)", "(C)"))
+# Combine plots into a single plot grid
+cowplot::plot_grid(plotlist = plots, ncol = 3L, labels = c("(A)", "(B)", "(C)"))
 ggsave("results/age-distributions.png", bg = "white", width = 18, height = 5)

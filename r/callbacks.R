@@ -3,7 +3,7 @@ anzics_hosp_epi_cb <- function(x, val_var, ...) {
   
   lvl <- "patient"
   
-  by_vars <- c("PatientID", "SiteID")
+  by_vars <- c("PatientID", "DSITEID")
   if (lvl == "patient-year") by_vars <- c(by_vars, "IcuAdmitYYYY")
   
   pts <- x[, list(icustay_cnt = .N), by = by_vars]
@@ -29,7 +29,8 @@ anzics_hosp_epi_cb <- function(x, val_var, ...) {
 
 anzics_irsad_cb <- function(x, val_var, env, ...) {
   
-  x <- merge(x, env$poa_seifa[, c("POA", "irsad_decile")], by = "POA")
-  x[, POA := irsad_decile]
+  x <- merge(x, env$poa_seifa[, c("postcode", "irsad_decile")], 
+             by = "postcode", all.x = TRUE)
+  x[, postcode := irsad_decile]
   x
 }

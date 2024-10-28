@@ -37,13 +37,14 @@ load_data <- function(src, outcome = "death", quick = FALSE) {
     if (outcome == "readm") {
       
       dat <- merge(dat, readm, all.x = TRUE)
+      dat[, readm := hosp_episode]
+      dat[, c("hosp_episode") := NULL]
     }
     
     dat[, sex := as.integer(sex == "Male")]
     dat[, majority := 1 - indig]
-    dat[, readm := hosp_episode]
     
-    dat[, c(index_var(dat), "indig", "hosp_episode") := NULL]
+    dat[, c(index_var(dat), "indig") := NULL]
     imp_lst <- list(
       age = 65,
       apache_iii_rod = median(dat$apache_iii_rod, na.rm = TRUE),

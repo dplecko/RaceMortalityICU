@@ -16,6 +16,17 @@ fcb_anz <- fairness_cookbook(
   data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
 )
 
+# osd_anz <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
+#                     X, Z, W, Y)
+osd_anz <- osd_anz[, c("ia", "psi_osd", "dev"), with=FALSE]
+osd_anz <- setnames(osd_anz, c("ia", "psi_osd", "dev"), 
+                    c("measure", "value", "sd"))
+osd_anz[measure == "x-DE", measure := "ctfde"]
+osd_anz[measure == "x-IE", measure := "ctfie"]
+osd_anz[measure == "x-SE", measure := "ctfse"]
+osd_anz[, method := "osd"]
+osd_anz[, Dataset := "ANZICS APD"]
+
 #' * Causal Explanation of Disparity (US) *
 dat <- load_data("miiv")
 
@@ -28,9 +39,21 @@ fcb_us <- fairness_cookbook(
   data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
 )
 
+# osd_us <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
+#                    X, Z, W, Y)
+osd_us <- osd_us[, c("ia", "psi_osd", "dev"), with=FALSE]
+osd_us <- setnames(osd_us, c("ia", "psi_osd", "dev"), 
+                    c("measure", "value", "sd"))
+osd_us[measure == "x-DE", measure := "ctfde"]
+osd_us[measure == "x-IE", measure := "ctfie"]
+osd_us[measure == "x-SE", measure := "ctfse"]
+osd_us[, method := "osd"]
+osd_us[, Dataset := "MIMIC-IV"]
+
 res <- rbind(
-  cbind(summary(fcb_anz)$measures, Dataset = "ANZICS APD"),
-  cbind(summary(fcb_us)$measures, Dataset = "MIMIC-IV")
+  cbind(summary(fcb_anz)$measures, Dataset = "ANZICS APD", method = "faircause"),
+  cbind(summary(fcb_us)$measures, Dataset = "MIMIC-IV", method = "faircause"),
+  osd_anz, osd_us
 )
 
 xlabz <- c(
@@ -47,13 +70,13 @@ res[res$measure %in% c("ctfse", "ctfie"), ]$value <-
   - res[res$measure %in% c("ctfse", "ctfie"), ]$value
 res$measure <- as.factor(res$measure)
 
-ggplot(res, aes(x = measure, y = value, fill = Dataset,
+ggplot(res, aes(x = measure, y = value, fill = interaction(Dataset, method),
                 ymin = value - 2.58*sd, ymax = value + 2.58*sd)) +
   geom_bar(position="dodge", stat = "identity", linewidth = 1.2,
            color = "black") +
   theme_minimal() +
   geom_errorbar(
-    aes(group = Dataset),
+    aes(group = interaction(Dataset, method)),
     position = position_dodge(0.9),
     color = "black", width = 0.25
   ) +

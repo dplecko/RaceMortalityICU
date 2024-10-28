@@ -1,11 +1,8 @@
 
 ricu:::init_proj()
 
-derr_plts <- list()
-outcome <- "death"
-
-for (country in c("AU", "NZ")) {
-
+de_rr <- function(country, outcome) {
+  
   c(pop_dat, dat) %<-% pop_and_dat(country, full = TRUE)
   
   dat[, diag_grp := apache_iii_diag]
@@ -58,25 +55,38 @@ for (country in c("AU", "NZ")) {
   res[, Admission := ifelse(apache_iii_diag >= 1200, "Surgical", "Medical")]
   # res <- res[Admission == "Medical"]
   
+  res[, outcome := ifelse(outcome == "death", "In-hospital Mortality", "Readmission")]
+  res[, country := ifelse(country == "AU", "Australia", "New Zealand")]
+  
   lmod <- lm(de_avg ~ rr, data = res[!is.infinite(rr)], 
              weights = res[!is.infinite(rr)]$N)
-  cat("--- Country =", country, "---\n")
-  print(summary(lmod))
-  derr_plts[[country]] <- ggplot(
-    res[!is.infinite(rr)], aes(x = rr, y = de_avg, size = N, color = Admission)) +
-    geom_point() + theme_bw() +
-    geom_abline(intercept = coef(lmod)[1], slope = coef(lmod)[2],
-                color = "red", linewidth = 1.2) +
-    xlab("Risk ratio for ICU admission") +
-    ylab("Diagnosis-specific Direct Effect") +
-    scale_y_continuous(labels = scales::percent) +
-    ggtitle(ifelse(country == "AU", "Australia", "New Zealand")) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-          legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-          legend.box.background = element_rect()) +
-    guides(size = "none")
+  
+  attr(res, "lmod") <- lmod
+  res
 }
 
-cowplot::plot_grid(plotlist = derr_plts, labels = c("(A)", "(B)"), ncol = 2L)
-ggsave(file.path(root, "results", paste0("de-rr-", outcome, ".png")), 
-       width = 12, height = 4)
+rr <- c()
+for (country in c("AU", "NZ")) {
+
+  for (outcome in c("death", "readm")) {
+    
+    rr <- rbind(rr, de_rr(country, outcome))
+  }
+}
+
+rr[, size := as.numeric(N / max(N)), by = c("outcome", "country")]
+ggplot(
+  rr[!is.infinite(rr)], aes(x = rr, y = de_avg, size = size, color = Admission)) +
+  geom_point() + theme_bw() +
+  xlab("Risk ratio for ICU admission") +
+  ylab("Diagnosis-specific Direct Effect") +
+  scale_y_continuous(labels = scales::percent) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        legend.position = "bottom",
+        legend.box.background = element_rect()) +
+  guides(size = "none") +
+  facet_grid(rows = vars(outcome), cols = vars(country)) +
+  geom_vline(xintercept = 1, color = "gray", linetype = "dashed") +
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed")
+
+ggsave(file.path("results", "de-rr.png"), width = 12, height = 8)

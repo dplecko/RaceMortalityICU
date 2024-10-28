@@ -1,8 +1,7 @@
 
 ricu:::init_proj()
-dat <- load_data("anzics")
 
-#' * Causal Explanation of Disparity *
+target_ia <- c("TE x SE", "DE x IE", "DE x SE", "IE x SE", "DE x IE x SE")
 
 # Constructing the SFM
 X <- "majority"
@@ -10,19 +9,30 @@ Z <- c("age", "sex")
 W <- c("apache_iii_rod", "apache_iii_diag")
 Y <- "death"
 
-# Decomposing the Disparity
-fcb <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
-)
-
-#' * TODO: this needs to be updated (!) *
-# Swap Labels
-dat[, majority := 1 - majority]
-fcb_swap <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
-)
-
-#' * TODO: implement interaction testing *
-p1 <- autoplot(fcb)
-p2 <- autoplot(fcb_swap)
-cowplot::plot_grid(p1, p2, labels = c("(a)", "(b)"), ncol = 2L)
+for (src in c("anzics", "miiv")) {
+  
+  dat <- load_data(src)
+  dat[, death := as.integer(death)]
+  
+  if (src == "miiv") {
+    
+    # Updating the SFM for new mediators
+    Z <- c("age", "sex")
+    W <- c("charlson", "acu_24", "diag_index")
+  }
+  
+  for (scale in c(FALSE, TRUE)) {
+    
+    # Performing interaction testing
+    res <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
+                    X, Z, W, Y, log_scale = scale)
+    
+    cat("Interaction testing for", src, "with log_scale =", scale, "\n")
+    # Computing the p-values
+    for (ia_type in target_ia) {
+      
+      pval <- 2 * pnorm(-abs(res[ia == ia_type]$psi_osd / res[ia == ia_type]$dev))
+      cat("p-value for interaction", ia_type, "=", pval, "\n")
+    }
+  }
+}

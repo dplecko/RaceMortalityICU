@@ -8,7 +8,7 @@
           "val_var": "PatientID",
           "add_var": "AdmEpisode",
           "year_var": "IcuAdmitYYYY",
-          "site_var": "SiteID",
+          "site_var": "DSITEID",
           "adm_var": "ICU_AD_DTM",
           "class": "col_itm",
           "callback": "anzics_hosp_epi_cb"
@@ -16,13 +16,13 @@
       ]
     }
   },
-  "POA": {
+  "postcode": {
     "target": "id_tbl",
     "sources": {
       "anzics": [
         {
           "table": "main",
-          "val_var": "POA",
+          "val_var": "postcode",
           "class": "col_itm"
         }
       ]
@@ -34,7 +34,7 @@
       "anzics": [
         {
           "table": "main",
-          "val_var": "POA",
+          "val_var": "postcode",
           "class": "col_itm",
           "callback": "anzics_irsad_cb"
         }

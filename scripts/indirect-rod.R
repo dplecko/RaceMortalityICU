@@ -46,6 +46,7 @@ names(dat_lst) <- srcs
 ils_plts <- list()
 for (src in srcs) {
   
+  dat <- load_data(src)
   dat_adj <- dat_lst[[src]]
   if (src == "anzics") {
     
@@ -58,7 +59,9 @@ for (src in srcs) {
                           labels = c("First Nations", "Majority")) +
       theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
             legend.box.background = element_rect(),
-            plot.title = element_text(hjust = 0.5, face = "bold", size = 18)) +
+            plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+            legend.title = element_text(size = 14),  # Adjust size of legend title
+            legend.text = element_text(size = 12)) +
       xlab("APACHE-III Risk of Death") + ylab("Probability Density") +
       ggtitle("Australia and New Zealand")
     
@@ -83,7 +86,8 @@ for (src in srcs) {
     pmf_dat[, maj := majority]
     pmf_dat[, size := nrow(dat[majority == maj]), by = c("ils", "maj")]
     pmf_dat[, obs_counts := round(pmf * size)]
-    print(chisq.test(x = cbind(pmf[majority == 1]$obs_counts, pmf[majority == 0]$obs_counts)))
+    # print(chisq.test(x = cbind(pmf_dat[majority == 1]$obs_counts, 
+    #                            pmf_dat[majority == 0]$obs_counts)))
     
     ils_plt <- ggplot(pmf_dat, 
                       aes(x = ils, y = pmf, fill = factor(majority))) +
@@ -94,44 +98,15 @@ for (src in srcs) {
                           labels = c("African-American", "White")) +
       theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
             legend.box.background = element_rect(),
-            plot.title = element_text(hjust = 0.5, face = "bold", size = 18)) +
+            plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+            legend.title = element_text(size = 14),  # Adjust size of legend title
+            legend.text = element_text(size = 12)) +
       xlab("SOFA score at 24 hours") + ylab("Probability Mass") +
       ggtitle("United States")
   }
   
   ils_plts[[src]] <- ils_plt
 }
-
-cowplot::plot_grid(plotlist = ils_plts, labels = c("(A)", "(B)"))
-ggsave(file.path("results", "ils-effect.png"), width = 12, height = 4)
-
-#' * diagnosis comparison * 
-diag_plts <- list()
-for (src in srcs) {
-  
-  dat_adj <- dat_lst[[src]]
-  diag_var <- if (src == "anzics") "apache_iii_diag" else "diag_index"
-  mort <- dat_adj[, list(mort = mean(death), size = .N), by = diag_var]
-  mort <- setnames(mort, diag_var, "diag")
-  mort_prop <- merge(
-    dat_adj[majority == 0, .N, by = diag_var][, list(prop0 = N / sum(N), 
-                                                     diag = get(diag_var))],
-    dat_adj[majority == 1, .N, by = diag_var][, list(prop1 = N / sum(N), 
-                                                     diag = get(diag_var))]
-  )
-  mort_prop <- merge(mort_prop, mort)
-  mort_prop[, rep_ratio := prop0 / prop1]
-  lm_mp <- lm(mort ~ rep_ratio, data = mort_prop, weights = mort_prop$size)
-  diag_plt <- ggplot(mort_prop, aes(x = rep_ratio, y = mort, size = size)) +
-    geom_point(show.legend = FALSE) + theme_bw() +
-    geom_abline(intercept = lm_mp$coefficients[1], slope = lm_mp$coefficients[2],
-                color = "red", linewidth = 1.2) +
-    xlab("Representation ratio") + ylab("Mortality")
-  diag_plts[[src]] <- diag_plt
-}
-
-cowplot::plot_grid(plotlist = diag_plts, labels = c("(A)", "(B)"))
-ggsave(file.path("results", "diag-effect.png"), width = 12, height = 4)  
 
 #' * chronic health comparison (MIMIC-IV) * 
 p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf, 
@@ -142,7 +117,9 @@ p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf,
   scale_fill_discrete(name = "Group", labels = c("African-American", "White")) +
   theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
         legend.box.background = element_rect(),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 18)) +
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        legend.title = element_text(size = 14),  # Adjust size of legend title
+        legend.text = element_text(size = 12)) +
   xlab("Charlson Comorbidity Index") + ylab("Probability Mass") +
   ggtitle("United States")
 
@@ -150,7 +127,6 @@ ils_plts <- c(ils_plts, list(p_charlson))
 cowplot::plot_grid(plotlist = ils_plts, labels = c("(A)", "(B)", "(C)"),
                    ncol = 3L)
 ggsave(file.path("results", "ils-effect.png"), width = 15, height = 4)
-# ggsave(file.path("results", "charlson-miiv.png"), width = 6, height = 4)
 
 #' * computing the p-values *
 srcs <- c("anzics", "miiv")

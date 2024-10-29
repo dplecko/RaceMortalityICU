@@ -1,24 +1,20 @@
 
 ricu:::init_proj()
+set.seed(2024)
 
 #' * Overlap analysis * 
 src <- "anzics"
 dat <- load_data(src)
-
-# Constructing the SFM
-X <- "majority"
-Z <- c("age", "sex")
-Y <- "death"
-if (src == "anzics") W <- c("apache_iii_rod", "apache_iii_diag") else
-  W <- c("acu_24", "charlson", "diag_index")
+c(X, Z, W, Y) %<-% attr(dat, "sfm")
 
 # Decomposing the Disparity
 fcb <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
+  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing"
 )
 
+eps <- 0.001 # 0.1%
 nolap <- data.table(
-  X = fcb$pw[["px_zw"]] < 0.01 | fcb$pw[["px_zw"]] > 0.99,
+  X = fcb$pw[["px_zw"]] < eps | fcb$pw[["px_zw"]] > 1-eps,
   W = dat$adm_diag,
   Z = dat$age
 )
@@ -58,3 +54,39 @@ lde <- local_de(dat, X, Z, W, Y)
 round(100 * c(mean(lde$estimate) - 1.96 * sd(lde$estimate), 
               mean(lde$estimate) + 1.96 * sd(lde$estimate)), 2)
 
+# sensitivity analysis for threshold impact
+thr_seq <- c(0, 0.0001, 0.001, 0.01)
+
+eps_sens <- NULL
+for (eps in thr_seq) {
+  
+  fcb_eps <- fairness_cookbook(
+    data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing",
+    eps = eps
+  )
+  
+  eps_sens <- rbind(
+    eps_sens, cbind(summary(fcb_eps)$measures, eps = eps)
+  )
+}
+
+eps_sens <- eps_sens[eps_sens$measure %in% c("ctfde", "ctfse", "ctfie"), ]
+eps_sens$measure <- ifelse(eps_sens$measure == "ctfde", "Direct",
+                           ifelse(eps_sens$measure == "ctfie", "Indirect", 
+                                  "Spurious"))
+
+ggplot(eps_sense, aes(x = factor(log(eps, 10)), y = value)) +
+  geom_line() + geom_point() +
+  geom_ribbon(aes(ymin = value - 1.96 * sd, ymax = value + 1.96 * sd),
+              linewidth = 0, alpha = 0.4) +
+  theme_bw() +
+  facet_wrap(~ measure) +
+  ylab("Effect Estimate") + xlab(tex("$\log_{10}(\epsilon)$")) +
+  theme(
+    axis.text = element_text(size = 14),
+    axis.title = element_text(size = 16)
+  )
+
+ggsave(paste0("results/overlap-", src, ".png"), width = 10, height = 7, 
+       bg = "white")
+  

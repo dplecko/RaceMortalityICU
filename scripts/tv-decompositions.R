@@ -1,66 +1,40 @@
 
+#' Performing a causal explanation of the disparity between groups.
+#' The total variation (TV) measure is decomposed into direct, indirect, and
+#' spurious effects.
 ricu:::init_proj()
-
-#' * Causal Explanation of Disparity (ANZ) *
 set.seed(2024)
-dat <- load_data("anzics")
 
-# Constructing the SFM
-X <- "majority"
-Z <- c("age", "sex", "country")
-Y <- "death"
-W <- c("apache_iii_rod", "apache_iii_diag")
-
-# Decomposing the disparity
-fcb_anz <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
-)
-
-# osd_anz <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
-#                     X, Z, W, Y)
-osd_anz <- osd_anz[, c("ia", "psi_osd", "dev"), with=FALSE]
-osd_anz <- setnames(osd_anz, c("ia", "psi_osd", "dev"), 
-                    c("measure", "value", "sd"))
-osd_anz[measure == "x-DE", measure := "ctfde"]
-osd_anz[measure == "x-IE", measure := "ctfie"]
-osd_anz[measure == "x-SE", measure := "ctfse"]
-osd_anz[, method := "osd"]
-osd_anz[, Dataset := "ANZICS APD"]
-
-#' * Causal Explanation of Disparity (US) *
-dat <- load_data("miiv")
-
-# Updating the SFM for new mediators
-Z <- c("age", "sex")
-W <- c("charlson", "acu_24", "diag_index")
-
-# Decomposing the Disparity
-fcb_us <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1
-)
-
-# osd_us <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
-#                    X, Z, W, Y)
-osd_us <- osd_us[, c("ia", "psi_osd", "dev"), with=FALSE]
-osd_us <- setnames(osd_us, c("ia", "psi_osd", "dev"), 
-                    c("measure", "value", "sd"))
-osd_us[measure == "x-DE", measure := "ctfde"]
-osd_us[measure == "x-IE", measure := "ctfie"]
-osd_us[measure == "x-SE", measure := "ctfse"]
-osd_us[, method := "osd"]
-osd_us[, Dataset := "MIMIC-IV"]
-
-res <- rbind(
-  cbind(summary(fcb_anz)$measures, Dataset = "ANZICS APD", method = "faircause"),
-  cbind(summary(fcb_us)$measures, Dataset = "MIMIC-IV", method = "faircause"),
-  osd_anz, osd_us
-)
+res <- NULL
+for (src in c("anzics", "miiv", "nzics", "aics")) {
+  
+  for (split_elective in c(FALSE, TRUE)) {
+    
+    for (one_hot in c(FALSE, TRUE)) {
+      
+      method <- if (split_elective) "split_" else "electvar_"
+      method <- paste0(method, if (one_hot) "OH" else "cts")
+      dat <- load_data(src, split_elective = split_elective, one_hot = one_hot)
+      cat("Decomposing TV on", srcwrap(src), method, "with SFM\n")
+      c(X, Z, W, Y) %<-% attr(dat, "sfm")
+      print_sfm(X, Z, W, Y)
+      
+      fcb <- fairness_cookbook(
+        data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
+        method = "debiasing"
+      )
+      
+      res <- rbind(
+        res, cbind(summary(fcb)$measures, Dataset = srcwrap(src), 
+                   method = method)
+      )
+    }
+  }
+}
 
 xlabz <- c(
-  tv = "Total Variation", # latex2exp::TeX("$TV_{x_0, x_1}(y)$"),
-  ctfde = "Direct Effect", # latex2exp::TeX("$Ctf$-$DE_{x_0, x_1}(y | x_0)$"),
-  ctfie = "Indirect Effect", # latex2exp::TeX("$Ctf$-$IE_{x_1, x_0}(y | x_0)$"),
-  ctfse = "Spurious Effect" # latex2exp::TeX("$Ctf$-$SE_{x_1, x_0}(y)$")
+  tv = "Total Variation", ctfde = "Direct Effect",
+  ctfie = "Indirect Effect", ctfse = "Spurious Effect"
 )
 
 res <- res[res$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
@@ -71,7 +45,7 @@ res[res$measure %in% c("ctfse", "ctfie"), ]$value <-
 res$measure <- as.factor(res$measure)
 
 ggplot(res, aes(x = measure, y = value, fill = interaction(Dataset, method),
-                ymin = value - 2.58*sd, ymax = value + 2.58*sd)) +
+                ymin = value - 1.96 * sd, ymax = value + 1.96 * sd)) +
   geom_bar(position="dodge", stat = "identity", linewidth = 1.2,
            color = "black") +
   theme_minimal() +
@@ -81,7 +55,7 @@ ggplot(res, aes(x = measure, y = value, fill = interaction(Dataset, method),
     color = "black", width = 0.25
   ) +
   theme(
-    legend.position = "inside",
+    legend.position = "right",
     legend.position.inside = c(0.4, 0.8),
     legend.box.background = element_rect(),
     legend.text = element_text(size = 20),
@@ -93,4 +67,4 @@ ggplot(res, aes(x = measure, y = value, fill = interaction(Dataset, method),
   xlab("Causal Fairness Measure") + ylab("Value") +
   scale_y_continuous(labels = scales::percent)
 
-ggsave("results/tv-decomp.png", width = 10, height = 6, bg = "white")
+ggsave("results/tv-decomp-no-elective.png", width = 10, height = 6, bg = "white")

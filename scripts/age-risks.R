@@ -24,8 +24,9 @@ for (country in c("AU", "NZ")) {
     by = c("age", "diag_grp")
   )
   pop_rr[, rr := risk.x / risk.y ]
-  pop_rr[, diag_name := anz_std_diag(diag_grp)]
-  p <- ggplot(pop_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19))], 
+  pop_rr[, diag_name := anz_std_diag(diag_grp, split_names = TRUE)]
+  p <- ggplot(pop_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19)) | 
+                       diag_grp %in% c(31:39))], 
          aes(x = diag_name, y = age, fill = trim_ends((rr), 5))) +
     geom_tile() +
     scale_fill_viridis_c(name = "Risk Ratio") + theme_minimal() +

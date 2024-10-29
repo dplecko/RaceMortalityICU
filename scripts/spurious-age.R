@@ -1,11 +1,12 @@
 
+#' Investigating spurious effects and age distributions.
 ricu:::init_proj()
 
 # Load datasets
 datasets <- list(
   US = load_data("miiv", quick = TRUE)[, c("age", "majority"), with = FALSE],
-  AU = load_data("anzics")[country == "AU"],
-  NZ = load_data("anzics")[country == "NZ"]
+  AU = load_data("aics"),
+  NZ = load_data("nzics")
 )
 
 # Plot settings for each dataset

@@ -112,15 +112,35 @@ std_diag <- function(admg) {
   )
 }
 
-anz_std_diag <- function(x) {
+anz_std_diag <- function(x, split_names = FALSE) {
   
-  map <- unique(data.frame(diag_grp = floor(anzics$d_diagnoses$diagnosis_code / 100), 
-                           grp_name = anzics$d_diagnoses$diagnosis_group))
+  if (any(x > 30)) {
+    
+    elect_idx <- x > 30
+    x[x > 30] <- x[x > 30] - 20
+  }
+  
+  map <- unique(data.frame(
+    diag_grp = floor(anzics$d_diagnoses$diagnosis_code / 100), 
+    grp_name = anzics$d_diagnoses$diagnosis_group
+  ))
   map <- as.data.table(map)
-  map[diag_grp <= 11, grp_name := paste(grp_name, "(Med.)")]
-  map[diag_grp > 11, grp_name := paste(grp_name, "(Surg.)")]
   
-  factor(map$grp_name[match(x, map$diag_grp)], levels = unique(map$grp_name))
+  map[diag_grp <= 11, grp_name := paste(grp_name, "(Med.)")]
+  map[diag_grp > 11, grp_name := paste(grp_name, "(Surg.)")] 
+  
+  nms <- map$grp_name[match(x, map$diag_grp)]
+  if (split_names) {
+    
+    nms[elect_idx] <- gsub("(Surg.)", "(Elect. Surg.)", nms[elect_idx])
+    nms[!elect_idx] <- gsub("(Surg.)", "(Emerg. Surg.)", nms[!elect_idx])
+    lvls <- unique(map$grp_name)
+    lvls_med <- lvls[!grepl("(Surg.)", lvls)]
+    lvls_surg <- lvls[grepl("(Surg.)", lvls)]
+    lvls <- c(lvls_med, gsub("(Surg.)", "(Emerg. Surg.)", lvls_surg),
+              gsub("(Surg.)", "(Elect. Surg.)", lvls_surg))
+  }
+  factor(nms, levels = lvls)
 }
 
 age_grp <- function(ages) {
@@ -186,10 +206,16 @@ study_flowchart <- function(src) {
     dat <- ndat
   }
   
-  browser()
-  
   cat("Ending with", nrow(dat), "admissions")
-  if (src == "anzics") cat(" from", length(unique(dat$site)), "sites\n")
+  if (src == "anzics") {
+    
+    dat <- merge(dat, load_concepts("country", "anzics"), all.x = TRUE)
+    print(table(dat$country))
+    for (cntry in c("Australia", "New Zealand")) {
+      
+      cat(cntry, " from", length(unique(dat[country == cntry]$site)), "sites\n")
+    }
+  }
   cat("\n")
 }
 
@@ -262,3 +288,5 @@ local_de <- function(dat, X, Z, W, Y, nboot = 50,
   
   res
 }
+
+Sys.setenv(N_CORES = parallel::detectCores()) # set to 64 for the cluster

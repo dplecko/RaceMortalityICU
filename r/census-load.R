@@ -199,13 +199,12 @@ pop_and_dat <- function(country, full = FALSE) {
     melt_and_add(census_min, majority = 0)
   )
   
+  src <- if (country == "AU") "aics" else "nzics"
   dat <- merge(
-    load_data("anzics"),
+    load_data(src, split_elective = TRUE), 
     load_concepts(c("adm_year"), "anzics", verbose = FALSE), 
     all.x = TRUE
   )
-  
-  dat <- if (country == "AU") dat[country == "AU"] else dat[country == "NZ"]
   
   dat[, age := age_grp(age)]
   dat[, diag_grp := floor(apache_iii_diag / 100)]

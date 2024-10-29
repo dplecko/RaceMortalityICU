@@ -52,8 +52,9 @@ de_rr <- function(country, outcome) {
     by = "apache_iii_diag"
   )
   
-  res[, Admission := ifelse(apache_iii_diag >= 1200, "Surgical", "Medical")]
-  # res <- res[Admission == "Medical"]
+  res[, Admission := ifelse(apache_iii_diag >= 3000, "Surgical (Elective)", 
+                            ifelse(apache_iii_diag >= 1200, "Surgical (Emergency)",
+                                   "Medical"))]
   
   res[, outcome := ifelse(outcome == "death", "In-hospital Mortality", "Readmission")]
   res[, country := ifelse(country == "AU", "Australia", "New Zealand")]

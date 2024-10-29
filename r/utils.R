@@ -14,7 +14,17 @@ srcwrap <- function(src) {
          mimic_demo = "MIMIC Demo",
          eicu_demo = "eICU Demo",
          anzics = "ANZICS APD",
+         nzics = "ANZICS APD (New Zealand)",
+         aics = "ANZICS APD (Australia)",
          sic = "SICdb",
          stop("unknown data source")
   )
+}
+
+print_sfm <- function(X, Z, W, Y) {
+  
+  cat("X:", paste(X, collapse = ", "), "\n")
+  cat("Z:", paste(Z, collapse = ", "), "\n")
+  cat("W:", paste(W, collapse = ", "), "\n")
+  cat("Y:", paste(Y, collapse = ", "), "\n")
 }

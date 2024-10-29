@@ -16,7 +16,7 @@ rr_boot <- function(country, nboot = 50) {
       dat <- dat[boot_idx]
     }
     
-    dat[, diag_grp := as.integer(diag_grp <= 11)]
+    dat[, diag_grp := diag_grp <= 11 + diag_grp <= 22]
     
     ts_risk <- as.data.table(
       expand.grid(age = unique(dat$age), diag_grp = unique(dat$diag_grp),

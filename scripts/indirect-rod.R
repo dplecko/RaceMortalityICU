@@ -1,4 +1,6 @@
 
+#' Investigating indirect effects: illness severity and chronic health 
+#' distributions.
 ricu:::init_proj()
 
 srcs <- c("anzics", "miiv")
@@ -60,7 +62,7 @@ for (src in srcs) {
       theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
             legend.box.background = element_rect(),
             plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-            legend.title = element_text(size = 14),  # Adjust size of legend title
+            legend.title = element_text(size = 14),
             legend.text = element_text(size = 12)) +
       xlab("APACHE-III Risk of Death") + ylab("Probability Density") +
       ggtitle("Australia and New Zealand")
@@ -99,7 +101,7 @@ for (src in srcs) {
       theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
             legend.box.background = element_rect(),
             plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-            legend.title = element_text(size = 14),  # Adjust size of legend title
+            legend.title = element_text(size = 14), 
             legend.text = element_text(size = 12)) +
       xlab("SOFA score at 24 hours") + ylab("Probability Mass") +
       ggtitle("United States")

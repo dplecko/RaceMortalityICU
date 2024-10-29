@@ -9,17 +9,11 @@ Z <- c("age", "sex")
 W <- c("apache_iii_rod", "apache_iii_diag")
 Y <- "death"
 
-for (src in c("anzics", "miiv")) {
+for (src in c("anzics", "miiv", "nzics", "aics")) {
   
   dat <- load_data(src)
   dat[, death := as.integer(death)]
-  
-  if (src == "miiv") {
-    
-    # Updating the SFM for new mediators
-    Z <- c("age", "sex")
-    W <- c("charlson", "acu_24", "diag_index")
-  }
+  c(X, Z, W, Y) %<-% attr(dat, "sfm")
   
   for (scale in c(FALSE, TRUE)) {
     

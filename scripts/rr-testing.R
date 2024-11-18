@@ -16,7 +16,7 @@ rr_boot <- function(country, nboot = 50) {
       dat <- dat[boot_idx]
     }
     
-    dat[, diag_grp := diag_grp <= 11 + diag_grp <= 22]
+    dat[, diag_grp := (diag_grp <= 11) + (diag_grp <= 22)]
     
     ts_risk <- as.data.table(
       expand.grid(age = unique(dat$age), diag_grp = unique(dat$diag_grp),
@@ -51,12 +51,36 @@ rr_boot <- function(country, nboot = 50) {
     ret <- rbind(ret, res)
   }
   
+  ret[, diag_grp_name := ifelse(diag_grp == 0, "Elective Surgery",
+                                ifelse(diag_grp == 1, "Emergency Surgery",
+                                       "Medical"))]
+  ret[, c("country") := country]
   ret
 } 
 
-for (country in c("AU", "NZ")) {
-  
-  cat(country, "\n")
-  rrb <- rr_boot(country, nboot = 100)
-  print(rrb[, mean(rr), by = "diag_grp"])
-}
+rrb <- NULL
+for (country in c("AU", "NZ")) rrb <- rbind(rrb, rr_boot(country, nboot = 100))
+
+rrb <- rrb[, list(rr = rr[seed==1], sd = sd(rr)), 
+           by = c("diag_grp_name", "country")] 
+print(rrb)
+
+ggplot(rrb, aes(x = diag_grp_name, y = rr, fill = country)) +
+  geom_col(position = "dodge", color = "black") +
+  geom_errorbar(aes(ymin = rr - 1.96 * sd, ymax = rr + 1.96 * sd),
+                position = position_dodge(0.9),
+                color = "black", width = 0.4) +
+  theme_bw() + xlab("Admission Type") + ylab("Risk Ratio") +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "orange",
+             linewidth = 1.25) +
+  scale_fill_discrete(name = "Country", labels = c("Australia", "New Zealand")) +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 12),
+    axis.text = element_text(size = 16),
+    axis.title.x = element_text(size = 18),
+    axis.text.x = element_text(),
+    title = element_text(size = 16)
+  )
+
+ggsave("results/rr-testing.png", width = 8, height = 5)

@@ -1,5 +1,5 @@
 
-Sys.setenv(RICU_CONFIG_PATH = "~/ICU/race-and-mortality/config")
+Sys.setenv(RICU_CONFIG_PATH = "~/ICU/rnm/config")
 library(ricu)
 library(ggplot2)
 library(ggrepel)

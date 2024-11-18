@@ -1,18 +1,20 @@
 
+
+#' Performing interaction testing, to investigate interactions of different
+#' causal pathways (direct, indirect, spurious). In total, 5 interactions are 
+#' tested: (1) TE x SE, for the interaction of total (causal) and spurious paths,
+#' (2) DE x IE, interaction of direct and indirect,
+#' (3) DE x SE, direct and spurious, (4) IE x SE, indirect and spurious,
+#' (5) DE x IE x SE, direct, indirect and spurious.
 ricu:::init_proj()
-
 target_ia <- c("TE x SE", "DE x IE", "DE x SE", "IE x SE", "DE x IE x SE")
-
-# Constructing the SFM
-X <- "majority"
-Z <- c("age", "sex")
-W <- c("apache_iii_rod", "apache_iii_diag")
-Y <- "death"
 
 for (src in c("anzics", "miiv", "nzics", "aics")) {
   
   dat <- load_data(src)
   dat[, death := as.integer(death)]
+  if (is.element("country", names(dat))) 
+    dat[, country := as.integer(country == "Australia")]
   c(X, Z, W, Y) %<-% attr(dat, "sfm")
   
   for (scale in c(FALSE, TRUE)) {

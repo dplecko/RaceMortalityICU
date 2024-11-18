@@ -55,10 +55,9 @@ round(100 * c(mean(lde$estimate) - 1.96 * sd(lde$estimate),
               mean(lde$estimate) + 1.96 * sd(lde$estimate)), 2)
 
 # sensitivity analysis for threshold impact
-thr_seq <- c(0, 0.0001, 0.001, 0.01)
-
-eps_sens <- NULL
-for (eps in thr_seq) {
+eps_seq <- c(0.0001, 0.001, 0.01)
+eps_sens <- cbind(summary(fcb)$measures, eps = 0)
+for (eps in eps_seq) {
   
   fcb_eps <- fairness_cookbook(
     data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing",
@@ -70,23 +69,28 @@ for (eps in thr_seq) {
   )
 }
 
-eps_sens <- eps_sens[eps_sens$measure %in% c("ctfde", "ctfse", "ctfie"), ]
-eps_sens$measure <- ifelse(eps_sens$measure == "ctfde", "Direct",
-                           ifelse(eps_sens$measure == "ctfie", "Indirect", 
-                                  "Spurious"))
+eps_sens[eps_sens$measure %in% c("ctfse", "ctfie"), ]$value <- 
+  -eps_sens[eps_sens$measure %in% c("ctfse", "ctfie"), ]$value
 
-ggplot(eps_sense, aes(x = factor(log(eps, 10)), y = value)) +
+meas <- c("tv", "ctfde", "ctfse", "ctfie")
+new_meas <- c("Total Variation", "Direct", "Indirect", "Spurious")
+eps_sens <- eps_sens[eps_sens$measure %in% meas, ]
+eps_sens$measure <- new_meas[match(eps_sens$measure, meas)]
+
+ggplot(eps_sens, aes(x = factor(log(eps, 10)), y = value, group = measure)) +
   geom_line() + geom_point() +
   geom_ribbon(aes(ymin = value - 1.96 * sd, ymax = value + 1.96 * sd),
               linewidth = 0, alpha = 0.4) +
   theme_bw() +
   facet_wrap(~ measure) +
-  ylab("Effect Estimate") + xlab(tex("$\log_{10}(\epsilon)$")) +
+  ylab("Effect Estimate") + xlab(latex2exp::TeX("$\\log_{10}(\\epsilon)$")) +
   theme(
     axis.text = element_text(size = 14),
-    axis.title = element_text(size = 16)
-  )
+    axis.title = element_text(size = 16),
+    strip.text = element_text(size = 16)
+  ) +
+  scale_y_continuous(labels = scales::percent)
 
-ggsave(paste0("results/overlap-", src, ".png"), width = 10, height = 7, 
+ggsave(paste0("results/overlap-sens-", src, ".png"), width = 11, height = 7, 
        bg = "white")
   

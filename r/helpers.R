@@ -52,7 +52,7 @@ boot_crf <- function(data, X, W, Y, nboot = 10) {
   preds <- matrix(NA, nrow = n, ncol = nboot)
   
   for (i in seq_len(nboot)) {
-    cat("Entering round", i, "\n")
+    cat("Entering round", i)
     
     # Define the output path for the current iteration
     output_path <- tempfile(fileext = ".csv")
@@ -72,7 +72,7 @@ boot_crf <- function(data, X, W, Y, nboot = 10) {
     # Fill the preds matrix
     preds[preds_dt$id, i] <- preds_dt$pred
     
-    cat("Finishing round", i, "\n")
+    cat(", and completing it.\n")
   }
   
   # Clean up temporary files
@@ -81,7 +81,7 @@ boot_crf <- function(data, X, W, Y, nboot = 10) {
   preds
 }
 
-std_diag <- function(admg) {
+std_diag <- function(admg, elective = NULL) {
   
   pairs <- matrix(
     c(
@@ -106,10 +106,15 @@ std_diag <- function(admg) {
     ), ncol = 2L, byrow = TRUE
   )
   
-  factor(
-    pairs[, 2][match(admg, pairs[, 1])],
-    levels = pairs[, 2][1:12]
-  )
+  adm_grp <- pairs[, 2][match(admg, pairs[, 1])]
+  levels <- pairs[, 2][1:12]
+  if (!is.null(elective)) {
+    
+    adm_grp[elective == 1] <- paste(adm_grp[elective == 1], "(Elect.)")
+    lvls <- c(pairs[, 2][1:12], paste(pairs[, 2][5:12], "(Elect.)"))
+  }
+  
+  factor(adm_grp, levels = lvls)
 }
 
 anz_std_diag <- function(x, split_names = FALSE) {
@@ -130,7 +135,11 @@ anz_std_diag <- function(x, split_names = FALSE) {
   map[diag_grp > 11, grp_name := paste(grp_name, "(Surg.)")] 
   
   nms <- map$grp_name[match(x, map$diag_grp)]
-  if (split_names) {
+  
+  if (!split_names) {
+    
+    return(factor(nms, levels = unique(map$grp_name)))
+  } else {
     
     nms[elect_idx] <- gsub("(Surg.)", "(Elect. Surg.)", nms[elect_idx])
     nms[!elect_idx] <- gsub("(Surg.)", "(Emerg. Surg.)", nms[!elect_idx])
@@ -139,8 +148,8 @@ anz_std_diag <- function(x, split_names = FALSE) {
     lvls_surg <- lvls[grepl("(Surg.)", lvls)]
     lvls <- c(lvls_med, gsub("(Surg.)", "(Emerg. Surg.)", lvls_surg),
               gsub("(Surg.)", "(Elect. Surg.)", lvls_surg))
+    return(factor(nms, levels = lvls))
   }
-  factor(nms, levels = lvls)
 }
 
 age_grp <- function(ages) {
@@ -159,64 +168,6 @@ age_grp <- function(ages) {
                     right = TRUE)
   
   return(as.character(age_groups))
-}
-
-study_flowchart <- function(src) {
-  
-  if (src == "anzics") {
-    
-    steps <- list(
-      list(cnc = "age", fn = function(x) x < 18),
-      list(cnc = "sex", fn = function(x) is.na(x)),
-      list(cnc = "elective", fn = function(x) is.na(x)),
-      list(cnc = "adm_episode", fn = function(x) x > 1),
-      list(cnc = "indig", fn = function(x) is.na(x))
-    )
-    
-    dat <- merge(
-      id_tbl(stay_id = anzics$main$ICUStayID),
-      load_concepts(c(vapply(steps, function(x) x[["cnc"]], character(1L)), 
-                      "site"), 
-                    "anzics", verbose = FALSE), all.x = TRUE
-    )
-  } else if (src == "miiv") {
-    
-    steps <- list(
-      list(cnc = "age", fn = function(x) x < 18),
-      list(cnc = "sex", fn = function(x) is.na(x)),
-      list(cnc = "adm_episode", fn = function(x) x > 1),
-      list(cnc = "race", 
-           fn = function(x) is.na(x) | !(x %in% c("Caucasian", 
-                                                  "African American")))
-    )
-    
-    dat <- merge(
-      id_tbl(stay_id = miiv$icustays$stay_id),
-      load_concepts(vapply(steps, function(x) x[["cnc"]], character(1L)), 
-                    "miiv", verbose = FALSE), all.x = TRUE
-    )
-  }
-  
-  cat("Starting with", nrow(dat), "admissions\n")
-  for (i in seq_along(steps)) {
-    
-    ndat <- dat[!steps[[i]][["fn"]](get(steps[[i]][["cnc"]]))]
-    cat("Removing", nrow(dat) - nrow(ndat), "admissions based on",
-        steps[[i]][["cnc"]], "\n")
-    dat <- ndat
-  }
-  
-  cat("Ending with", nrow(dat), "admissions")
-  if (src == "anzics") {
-    
-    dat <- merge(dat, load_concepts("country", "anzics"), all.x = TRUE)
-    print(table(dat$country))
-    for (cntry in c("Australia", "New Zealand")) {
-      
-      cat(cntry, " from", length(unique(dat[country == cntry]$site)), "sites\n")
-    }
-  }
-  cat("\n")
 }
 
 local_de <- function(dat, X, Z, W, Y, nboot = 50, 

@@ -31,7 +31,7 @@ vars <- list(
   )
 )
 
-miss_tbl <- FALSE
+miss_tbl <- TRUE
 for (src in c("miiv", "anzics", "aics", "nzics")) {
   
   if (is.element(src, c("anzics", "nzics", "aics"))) {

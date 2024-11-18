@@ -76,7 +76,7 @@ build_tables <- function(lvl = "SA3", ret = c("tbls", "qual")) {
 
 area_map <- function() {
   
-  folder <- file.path(ricu::data_dir(), "raw", "anzics")
+  folder <- file.path(ricu::data_dir(), "raw", "anzics-2024")
   if (file.exists("data/area-map.RData")) {
     
     load(file.path("data/area-map.RData"))

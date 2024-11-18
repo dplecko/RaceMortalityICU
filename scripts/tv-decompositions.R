@@ -8,28 +8,20 @@ set.seed(2024)
 res <- NULL
 for (src in c("anzics", "miiv", "nzics", "aics")) {
   
-  for (split_elective in c(FALSE, TRUE)) {
-    
-    for (one_hot in c(FALSE, TRUE)) {
-      
-      method <- if (split_elective) "split_" else "electvar_"
-      method <- paste0(method, if (one_hot) "OH" else "cts")
-      dat <- load_data(src, split_elective = split_elective, one_hot = one_hot)
-      cat("Decomposing TV on", srcwrap(src), method, "with SFM\n")
-      c(X, Z, W, Y) %<-% attr(dat, "sfm")
-      print_sfm(X, Z, W, Y)
-      
-      fcb <- fairness_cookbook(
-        data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
-        method = "debiasing"
-      )
-      
-      res <- rbind(
-        res, cbind(summary(fcb)$measures, Dataset = srcwrap(src), 
-                   method = method)
-      )
-    }
-  }
+  dat <- load_data(src)
+  cat("Decomposing TV on", srcwrap(src), method, "with SFM\n")
+  c(X, Z, W, Y) %<-% attr(dat, "sfm")
+  print_sfm(X, Z, W, Y)
+  
+  fcb <- fairness_cookbook(
+    data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
+    method = "debias"
+  )
+  
+  res <- rbind(
+    res, cbind(summary(fcb)$measures, Dataset = srcwrap(src), 
+               method = method)
+  )
 }
 
 xlabz <- c(

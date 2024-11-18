@@ -183,8 +183,8 @@ pop_and_dat <- function(country, full = FALSE) {
   
   census <- census(country)
   
-  census_tot <- interpolate_census(census[["total"]], 2010, 2022)
-  census_min <- interpolate_census(census[["minority"]], 2010, 2022)
+  census_tot <- interpolate_census(census[["total"]], 2010, 2024)
+  census_min <- interpolate_census(census[["minority"]], 2010, 2024)
   census_maj <- cbind(age = census_tot$age, census_tot[, -1] - census_min[, -1])
   
   melt_and_add <- function(df, majority = 0) {
@@ -209,7 +209,11 @@ pop_and_dat <- function(country, full = FALSE) {
   dat[, age := age_grp(age)]
   dat[, diag_grp := floor(apache_iii_diag / 100)]
   dat[diag_grp == 7, diag_grp := 6]
-  if (!full) dat[, c("country", "apache_iii_diag") := NULL]
+  if (!full) {
+    
+    dat[, c("apache_iii_diag") := NULL]
+    if (is.element("country", names(dat))) dat[, c("country") := NULL]
+  }
   dat <- setnames(dat, "adm_year", "year")
   
   list(pop_dat = pop_dat, dat = dat)

@@ -73,8 +73,10 @@ ts_risk <- function(country, boot = 1, split_elective = TRUE) {
 
 ts_rr <- rbind(ts_risk("AU"), ts_risk("NZ"))
 ts_rr[risk.x == 0 & risk.y == 0, rr := 1]
+lvl_ord <- c("Medical", "Surgical (Emergency)", "Surgical (Elective)")
+ts_rr[, diag_grp_name := factor(diag_grp_name, levels = lvl_ord)]
 
-ggplot(ts_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19) | diag_grp %in% c(31:39)) & 
+p1 <- ggplot(ts_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19) | diag_grp %in% c(31:39)) & 
               year >= intrvl[1] & year <= intrvl[2]], 
        aes(x = year, y = log(rr), color = diag_name)) +
   geom_line(linewidth = 0.5) + theme_bw() + geom_point() +
@@ -89,6 +91,15 @@ ggplot(ts_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19) | diag_grp %in% c(31:39
     show.legend = FALSE, max.overlaps = 26
   ) + guides(text = NULL) +
   facet_grid(cols = vars(diag_grp_name), rows = vars(country),
-             scales = "free_y")
+             scales = "free_y") +
+  theme(
+    legend.box.background = element_rect(),
+    legend.text = element_text(size = 12),
+    axis.text = element_text(size = 16),
+    axis.title.x = element_text(size = 18),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+    title = element_text(size = 16),
+    strip.text = element_text(size = 14)
+  )
 
-ggsave("results/pop-risk-ts.png", width = 16, height = 8)
+ggsave("results/pop-risk-ts.png", plot = p1, width = 18, height = 9)

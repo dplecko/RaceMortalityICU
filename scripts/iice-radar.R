@@ -88,7 +88,7 @@ iice_radar <- function(lvl = "SA3") {
   ts_rr[is.nan(rr), rr := NA]
   
   # load the shape file for lvl
-  folder <- file.path(ricu::data_dir(), "raw", "anzics")
+  folder <- file.path(ricu::data_dir(), "raw", "anzics-2024")
   shp <- sf::st_read(file.path(folder, paste0(tolower(lvl), "-shp"), 
                                paste0(tolower(lvl), "-shp.shp")))
   shp <- as.data.table(shp)
@@ -102,8 +102,13 @@ iice_radar <- function(lvl = "SA3") {
   
   # plot the radar
   ggplot(shp) +
-    geom_sf(aes(fill = pmin(rr, 5), geometry = geometry)) +      # Map fill aesthetic to the 'rr' column
-    scale_fill_viridis_c() +       # Use a color scale for continuous data (you can customize the scale)
-    theme_minimal() +              # Minimal theme for a clean look
-    labs(fill = "RR Value")        # Add a label for the color legend
+    geom_sf(aes(fill = pmin(rr, 5), geometry = geometry)) +
+    # scale_fill_viridis_c() +  
+    scale_fill_gradient2(name = "Risk Ratio", low = "blue", high = "red", 
+                         mid = "white", midpoint = 1) +
+    theme_minimal() +
+    labs(fill = "Risk Ratio") +
+    coord_sf(xlim = c(110, 160))
 }
+
+ggsave("results//iice-radar.png", width = 10, height = 6, bg = "white")

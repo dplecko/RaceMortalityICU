@@ -28,3 +28,17 @@ print_sfm <- function(X, Z, W, Y) {
   cat("W:", paste(W, collapse = ", "), "\n")
   cat("Y:", paste(Y, collapse = ", "), "\n")
 }
+
+save_plt <- function(p, name, cache = TRUE, ...) {
+  
+  folder <- "results"
+  if (cache) {
+    folder <- file.path(folder, "cache")
+    name <- paste0(name, "-", Sys.Date())
+  }
+  name <- paste0(name, ".png")
+  ggsave(
+    filename = file.path(folder, name),
+    plot = p, ...
+  )
+}

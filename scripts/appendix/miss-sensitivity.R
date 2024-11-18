@@ -3,15 +3,16 @@
 #' performed, with the indigenous status imputed. The results are compared with
 #' the decomposition of the TV measure obtained on the complete dataset, with no
 #' indigenous status missingness.
+ricu:::init_proj()
 
 # obtaining the TV decomposition on full data
 src <- "anzics"
-dat <- load_data(src)
+dat <- load_data(src, no_miss = FALSE)
 c(X, Z, W, Y) %<-% attr(dat, "sfm")
 print_sfm(X, Z, W, Y)
 
 fcb_complete <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
+  data = dat[complete.cases(dat)], X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
   method = "debiasing"
 )
 
@@ -19,10 +20,14 @@ res <- summary(fcb_complete)$measures
 # change IE, SE signs of easier interpretability
 res[res$measure %in% c("ctfse", "ctfie"), ]$value <- 
   - res[res$measure %in% c("ctfse", "ctfie"), ]$value
+res <- as.data.table(res)
 
-mi_data <- function(src, n_imp) {
+mi_data <- function(dat, n_imp) {
   
-  dat <- load_data(src, no_miss = FALSE)
+  # fix the country value if needed
+  if (is.element("country", names(dat))) 
+    dat[, c("country") := as.integer(country == "Australia")]
+  
   cmp_dat <- dat[complete.cases(dat)]
   mis_dat <- dat[!complete.cases(dat)]
   c(X, Z, W, Y) %<-% attr(dat, "sfm")
@@ -45,7 +50,7 @@ qnormmix <- function(p, value, sd) {
   
   k <- length(value)
   samples <- replicate(10000, {
-    component <- sample(1:k, 1, prob = lambda)
+    component <- sample(1:k, 1)
     rnorm(1, mean = value[component], sd = sd[component])
   })
   
@@ -53,7 +58,7 @@ qnormmix <- function(p, value, sd) {
 }
 
 n_imp <- 10
-mi_lst <- mi_data(src, n_imp)
+mi_lst <- mi_data(dat, n_imp)
 mi_res <- NULL
 for (i in seq_len(n_imp)) {
   
@@ -70,25 +75,22 @@ for (i in seq_len(n_imp)) {
   mi_res <- rbind(mi_res, add)
 }
 
-
 mi_res <- as.data.table(mi_res)
-mi_res[, qnormmix(c(0.025, 0.975), value, sd), by = "measure"]
+mi_res <- mi_res[, qnormmix(c(0.025, 0.975), value, sd), by = "measure"]
 mi_res <- setnames(mi_res, c("V1", "V2", "V3"), c("value", "lwr", "upr"))
 
 res <- res[, list(value = value, lwr = value - 1.96 * sd, upr = value + 1.96 * sd), 
            by = "measure"]
 
-res <- res[res$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
-res$measure <- as.factor(res$measure)
-
-plt <- rbind(cbind(res, type = "Complete"), 
+plt <- rbind(cbind(res, type = "Complete Data"), 
              cbind(mi_res, type = "Multiple Imputation"))
+plt <- plt[plt$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
 xlabz <- c(
-  tv = "Total Variation", ctfde = "Direct Effect",
-  ctfie = "Indirect Effect", ctfse = "Spurious Effect"
+  tv = "Total Variation", ctfse = "Spurious Effect", ctfde = "Direct Effect",
+  ctfie = "Indirect Effect"
 )
 
-ggplot(res, aes(x = measure, y = value, fill = factor(type),
+ggplot(plt, aes(x = measure, y = value, fill = factor(type),
                 ymin = lwr, ymax = upr)) +
   geom_bar(position="dodge", stat = "identity", linewidth = 1.2,
            color = "black") +
@@ -99,15 +101,18 @@ ggplot(res, aes(x = measure, y = value, fill = factor(type),
     color = "black", width = 0.25
   ) +
   theme(
-    legend.position = "right",
+    legend.position = "bottom",
     legend.position.inside = c(0.4, 0.8),
     legend.box.background = element_rect(),
-    legend.text = element_text(size = 20),
+    legend.text = element_text(size = 18),
+    legend.title = element_text(size = 21),
     axis.text = element_text(size = 16),
     axis.title.x = element_text(size = 18),
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
     title = element_text(size = 16)
-  ) + scale_x_discrete(labels = xlabz) +
+  ) + 
+  scale_fill_discrete(name = "Method ") +
+  scale_x_discrete(labels = xlabz) +
   xlab("Causal Fairness Measure") + ylab("Value") +
   scale_y_continuous(labels = scales::percent)
 
+ggsave("results/miss-sens.png", width = 8, height = 5, bg = "white")

@@ -68,14 +68,6 @@ load_data <- function(src, outcome = "death",
           dat[is.na(get(var)), c(var) := imp_lst[[var]]]
       }
       
-      if (no_miss) {
-        
-        dat <- dat[complete.cases(dat)]
-      } else {
-        
-        dat <- dat[complete.cases(dat[, -c("majority")])]
-      }
-      
       # subset to Australia or New Zealand accordingly
       if (src == "aics") {
         
@@ -165,6 +157,14 @@ load_data <- function(src, outcome = "death",
     save(dat, file = fl_path)
   }
   
+  if (no_miss) {
+    
+    dat <- dat[complete.cases(dat)]
+  } else {
+
+    dat <- dat[complete.cases(dat[, -c("majority")])]
+  }
+  
   if (is.element(src, c("aics", "nzics"))) sfm$Z <- setdiff(sfm$Z, "country")
   if (is.element(src, c("anzics", "nzics"))) sfm$Z <- setdiff(sfm$Z, "irsad")
   
@@ -172,7 +172,6 @@ load_data <- function(src, outcome = "death",
     
     dat[apache_iii_diag >= 1200, 
         apache_iii_diag := apache_iii_diag + 2000 * elective]
-    dat[diag_group >= 12, diag_group := diag_group + 20 * elective]
     sfm$W <- setdiff(sfm$W, "elective")
   } else if (src == "miiv" & split_elective) {
     
@@ -190,6 +189,7 @@ load_data <- function(src, outcome = "death",
     sfm$W <- c(setdiff(sfm$W, diag_col), colnames(diag_mat))
   }
   
+  dat[, age := round(age)]
   attr(dat, "sfm") <- sfm
   dat
 }

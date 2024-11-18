@@ -97,9 +97,9 @@ patient_table <- function(source, patient_ids, nms, vars, report_pvals = FALSE) 
 
 table_to_tex <- function(res) {
   
-  kable(res, format = "latex", booktabs = TRUE, 
+  kableExtra::kable(res, format = "latex", booktabs = TRUE, 
         align = c('l', rep('c', ncol(res) - 1))) %>%
-    kable_styling(latex_options = c("hold_position"))
+    kableExtra::kable_styling(latex_options = c("hold_position"))
 }
 
 med_iqr <- function(x, patient_ids) {

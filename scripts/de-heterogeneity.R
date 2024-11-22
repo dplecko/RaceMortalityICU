@@ -12,21 +12,35 @@ set.seed(2024)
 outcomes <- "death" # c("death", "readm")
 srcs <- "aics" # c("anzics", "aics", "nzics", "miiv")
 
+setting <- list(
+  s1 = list(src = "anzics", irsad = FALSE, split_elective = FALSE, one_hot = FALSE),
+  s2 = list(src = "aics", irsad = FALSE, split_elective = FALSE, one_hot = FALSE),
+  s3 = list(src = "aics", irsad = TRUE, split_elective = FALSE, one_hot = FALSE),
+  s4 = list(src = "aics", irsad = TRUE, split_elective = TRUE, one_hot = FALSE),
+  s5 = list(src = "aics", irsad = TRUE, split_elective = TRUE, one_hot = TRUE)
+)
+
 for (outcome in outcomes) {
   
-  for (src in srcs) {
+  for (i in seq_along(setting)) {
     
+    src <- setting[[i]]$src
     fl_path <- file.path(root, "data", paste0("de-crf-", src, "-", outcome, ".RData"))
-    dat <- load_data(src, outcome = outcome, split_elective = TRUE, one_hot = FALSE)
+    dat <- load_data(src, outcome = outcome, 
+                     split_elective = setting[[i]]$split_elective, 
+                     one_hot = setting[[i]]$one_hot)
+    # dat <- dat[1:10000]
+    
     if (is.element("country", names(dat))) 
       dat[, country := as.integer(country == "Australia")]
     
-    if (file.exists(fl_path)) load(fl_path) else {
+    if (!setting[[i]]$irsad) attr(dat, "sfm")$Z <- setdiff(attr(dat, "sfm")$Z, "irsad")
+    # if (file.exists(fl_path)) load(fl_path) else {
       
-      de_crf <- boot_crf(data = dat, X = c(attr(dat, "sfm")$Z, attr(dat, "sfm")$W), 
-                         W = attr(dat, "sfm")$X, Y = attr(dat, "sfm")$Y)
-      save(de_crf, file = fl_path)
-    }
+    de_crf <- boot_crf(data = dat, X = c(attr(dat, "sfm")$Z, attr(dat, "sfm")$W), 
+                       W = attr(dat, "sfm")$X, Y = attr(dat, "sfm")$Y)
+      # save(de_crf, file = fl_path)
+    # }
     
     dat <- dat[, de_mean := rowMeans(de_crf, na.rm = TRUE)]
     dat <- dat[, de_var := rowVars(de_crf, na.rm = TRUE)]
@@ -55,7 +69,7 @@ for (outcome in outcomes) {
       geom_vline(xintercept = 4.5, color = "red") +
       ylab("Age group (years)") + xlab("Diagnosis group")
     
-     ggsave(paste0("results/de-hetero-", src, "-", outcome, ".png"), 
+     ggsave(paste0("results/cache/de-hetero-step-", i, ".png"), 
            width = 10, height = 7, bg = "white")
   }
 }

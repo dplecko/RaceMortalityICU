@@ -1,52 +1,70 @@
 
 #' Inspection of conditional direct effects.
+# nohup Rscript scripts/de-E-cond.R > de-E-cond.log 2>&1 &
 ricu:::init_proj()
-src <- "nzics"
-dat <- load_data(src, split_elective = TRUE)
+set.seed(2024)
+src <- "aics"
+outcome <- "readm"
+dat <- load_data(src, outcome = outcome, split_elective = TRUE)
 dat <- dat[, diag_grp := floor(apache_iii_diag / 100)]
 c(X, Z, W, Y) %<-% attr(dat, "sfm")
 
 print_sfm(X, Z, W, Y)
 
-# 3 admission groups
-sel_covs <- c("apache_iii_diag") # "majority"
-E_lst <- cmbn_E(sel_covs)
-cde <- cnd_effect(as.data.frame(dat), X = X, Z = Z, W = W, Y = Y, E_lst = E_lst)
+# new S3 implementation of conditional effects
+E_sets <- list(
+  A = c("diag_grp"),
+  B = c("age"),
+  C = c("diag_grp", "age"),
+  D = c("apache_iii_diag")
+)
 
-dg_grp_cnd <- ggplot(cde, aes(x = factor(apache_iii_diag), y = effect)) +
-  geom_col() + theme_bw() +
-  geom_errorbar(aes(ymin = effect - 1.96 * sd, ymax = effect + 1.96 * sd)) +
-  xlab("Diagnosis Group") + ylab("DE(x0 -> x1 | E)")
+# train the inference object
+for (method in c("osd", "crf")) {
+  
+  cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
+                         method = method)
+  
+  for (i in seq_along(E_sets)) {
+    
+    for (minority in c(FALSE, TRUE)) {
+      
+      sel_covs <- E_sets[[i]] # 
+      if (minority) sel_covs <- c(sel_covs, "majority")
+      
+      E_lst <- cmbn_E(sel_covs)
+      cde <- infer(cndE_obj, E_lst)
+      
+      # create plot title
+      ttl <- paste(c(src, outcome, method, sel_covs), collapse = "-")
+      
+      # create plot depending on dimensionality
+      E_plt <- plt_E_cnd(cde, sel_covs, ttl)
+      # save plot
+      save_plt(E_plt, paste0(ttl, ".png"), width = 5, height = 5, bg = "white")
+    }
+  }
+}
 
-save_plt(dg_grp_cnd, paste0("diag-grp-de-all", src), width = 5, height = 4)
-
-# 3 groups x 4 age quartiles
-sel_covs <- c("age", "apache_iii_diag", "majority")
-E_lst <- cmbn_E(sel_covs)
-cde <- cnd_effect(as.data.frame(dat), X = X, Z = Z, W = W, Y = Y, E_lst = E_lst)
-
-dg_age_cnd <- ggplot(cde, aes(x = factor(apache_iii_diag), y = factor(age), 
-                              fill = effect)) +
-  geom_tile() + theme_minimal() +
-  xlab("Diagnosis Group") + ylab("Age Group") +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, name = "DE", labels = scales::percent) +
-  geom_text(aes(label = paste0(round(effect * 100, 1), "%")), 
-            color = "black", size = 3)
-
-save_plt(dg_age_cnd, paste0("diag-age-de-minority", src), 
-         width = 5, height = 5, bg = "white")
-
-cde <- de_residuals(src, "death")
-cde$apache_iii_diag <- as.numeric(cde$apache_iii_diag)
-cde$diag_group <- cut(cde$apache_iii_diag, 
-                      breaks = c(-Inf, 1199.5, 2299.5, Inf),
-                      labels = c("Med", "Surg (Emergency)", "Surg (Elective)"))
-
-ggplot(cde, aes(x = factor(apache_iii_diag), y = de_resid, color = diag_group)) +
-  geom_line() + geom_point() + theme_bw() +
-  geom_errorbar(aes(ymin = effect - 1.96 * sd, ymax = effect + 1.96 * sd)) +
-  xlab("APACHE-III Diagnosis") + ylab("DE(x0 -> x1 | E)") +
-  coord_cartesian(ylim = c(-0.1, 0.1))
-
-
+# concordance of residuals
+# E_lst <- cmbn_E("apache_iii_diag")
+# concord <- NULL
+# for (method in c("osd", "crf")) {
+#   
+#   cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
+#                          method = method)
+#   cde <- infer(cndE_obj, E_lst)
+#   concord <- rbind(concord, cbind(cde, method = method))
+# }
+# 
+# plt_concord <- merge(
+#   concord[method == "osd", c("effect", "apache_iii_diag")],
+#   concord[method == "crf", c("effect", "apache_iii_diag")], 
+#   by = "apache_iii_diag"
+# )
+# 
+# ggplot(plt_concord, aes(x = effect.x, y = effect.y)) +
+#   theme_bw() + xlab("OSD") + ylab("CRF") +
+#   geom_point() +
+#   geom_abline(slope = 1, intercept = 0, color = "red") +
+#   coord_cartesian(xlim = c(-0.1, 0.1))

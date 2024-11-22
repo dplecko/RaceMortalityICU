@@ -191,5 +191,6 @@ load_data <- function(src, outcome = "death",
   
   dat[, age := round(age)]
   attr(dat, "sfm") <- sfm
+  attr(dat, "src") <- src
   dat
 }

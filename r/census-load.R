@@ -179,8 +179,10 @@ interpolate_census <- function(data, start, end) {
   res
 }
 
-pop_and_dat <- function(country, full = FALSE) {
+pop_and_dat <- function(country, full = FALSE, 
+                        dg_mod = c("single", "adm_type", "apache_group", "apache_iii")) {
   
+  dg_mod <- match.arg(dg_mod, c("single", "adm_type", "apache_group", "apache_iii"))
   census <- census(country)
   
   census_tot <- interpolate_census(census[["total"]], 2010, 2024)
@@ -207,8 +209,21 @@ pop_and_dat <- function(country, full = FALSE) {
   )
   
   dat[, age := age_grp(age)]
-  dat[, diag_grp := floor(apache_iii_diag / 100)]
-  dat[diag_grp == 7, diag_grp := 6]
+  
+  if (dg_mod == "single") dat[, diag_grp := 1] else if (dg_mod == "adm_type") {
+    
+    dat[, diag_grp := ifelse(apache_iii_diag >= 3000, "Surgical (Elective)", 
+                              ifelse(apache_iii_diag >= 1200, "Surgical (Emergency)",
+                                     "Medical"))]
+  } else if (dg_mod == "apache_group") {
+    
+    dat[, diag_grp := floor(apache_iii_diag / 100)]
+    dat[diag_grp == 7, diag_grp := 6]
+  } else if (dg_mod == "apache_iii") {
+    
+    dat[, diag_grp := apache_iii_diag]
+  }
+  
   if (!full) {
     
     dat[, c("apache_iii_diag") := NULL]

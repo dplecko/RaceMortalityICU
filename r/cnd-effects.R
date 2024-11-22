@@ -211,13 +211,13 @@ cmbn_E <- function(sel_covs) {
   
   covs <- list(
     diag_grp = list(
-      med = list(
+      `Medical` = list(
         apache_iii_diag = 0:1199
       ),
-      surg_em = list(
+      `Surgical (Emergency)` = list(
         apache_iii_diag = 1200:2299
       ),
-      surg_el = list(
+      `Surgical (Elective)` = list(
         apache_iii_diag = 2300:4299
       )
     ),
@@ -257,7 +257,18 @@ cmbn_E <- function(sel_covs) {
 
 plt_E_cnd <- function(cde, sel_covs, ttl) {
   
+  cov_lbl <- function(x) {
+    
+    if (x == "age") return("Age group (years)")
+    if (x == "diag_grp") return("Diagnosis Group")
+  }
+  
   plt_covs <- setdiff(sel_covs, "majority")
+  if (is.element("diag_grp", plt_covs)) {
+    
+    lvl_ord <- c("Medical", "Surgical (Emergency)", "Surgical (Elective)")
+    cde[, diag_grp := factor(diag_grp, levels = lvl_ord)]
+  }
   
   if (length(plt_covs) == 1) {
     
@@ -269,11 +280,16 @@ plt_E_cnd <- function(cde, sel_covs, ttl) {
       ggtitle(ttl)
   } else {
     
+    # get 1\sigma, 2\Sigma opacity labels
+    cde[, opa := ifelse(abs(effect) / sd > 2, 1, 
+                        ifelse(abs(effect) / sd > 1, 0.6, 0.3))]
+    
     cde[[plt_covs[1]]] <- factor(cde[[plt_covs[1]]])
     cde[[plt_covs[2]]] <- factor(cde[[plt_covs[2]]])
     p <- ggplot(cde, aes(x = .data[[plt_covs[1]]], y = .data[[plt_covs[2]]], 
                          fill = effect)) +
-      geom_tile() + theme_minimal() +
+      geom_tile(aes(alpha = opa)) + 
+      theme_minimal() +
       scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
                            midpoint = 0, name = "DE", labels = scales::percent) +
       geom_text(
@@ -282,7 +298,11 @@ plt_E_cnd <- function(cde, sel_covs, ttl) {
                            round((effect+1.96*sd)*100, 1), "%]")), 
         color = "black", size = 3
       ) +
-      ggtitle(ttl)
+      ggtitle(ttl) +
+      guides(
+        alpha = "none"
+      ) +
+      xlab(cov_lbl(plt_covs[1])) + ylab(cov_lbl(plt_covs[2]))
   }
   
   p

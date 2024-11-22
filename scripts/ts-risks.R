@@ -8,7 +8,7 @@ intrvl <- c(2018, 2024)
 ts_risk <- function(country, boot = 1, split_elective = TRUE) {
   
   age_adjust <- TRUE
-  c(pop_dat, dat) %<-% pop_and_dat(country)
+  c(pop_dat, dat) %<-% pop_and_dat(country, dg_mod = "apache_group")
   
   if (boot > 1) {
     
@@ -17,7 +17,12 @@ ts_risk <- function(country, boot = 1, split_elective = TRUE) {
   }
   
   # get a table
-  ts_risk <- 
+  ts_risk <- as.data.table(
+    expand.grid(
+      age = unique(dat$age), diag_grp = unique(dat$diag_grp),
+      majority = unique(dat$majority), year = unique(dat$year)
+    )
+  )
   
   ts_risk <- merge(
     ts_risk, dat[, .N, by = c("age", "diag_grp", "majority", "year")],
@@ -31,18 +36,18 @@ ts_risk <- function(country, boot = 1, split_elective = TRUE) {
     by = c("age", "majority", "year"), all.x = TRUE
   )
   
-  browser()
-  
-  age_strat <- copy(ts_risk)
-  age_strat <- age_strat[diag_grp < 12, list(risk = sum(N) / sum(V1)), 
-                      by = c("year", "age", "majority")]
-  age_strat <- merge(age_strat[majority == 0], age_strat[majority == 1], 
-                     by = c("year", "age")) 
-  age_strat[, rr := risk.x / risk.y]
-  
-  ggplot(age_strat, aes(x = age, y = rr)) +
-    facet_wrap(~ year) + theme_bw() +
-    geom_line() + geom_point()
+  # browser()
+  # 
+  # age_strat <- copy(ts_risk)
+  # age_strat <- age_strat[diag_grp < 12, list(risk = sum(N) / sum(V1)), 
+  #                     by = c("year", "age", "majority")]
+  # age_strat <- merge(age_strat[majority == 0], age_strat[majority == 1], 
+  #                    by = c("year", "age")) 
+  # age_strat[, rr := risk.x / risk.y]
+  # 
+  # ggplot(age_strat, aes(x = age, y = rr)) +
+  #   facet_wrap(~ year) + theme_bw() +
+  #   geom_line() + geom_point()
   
   if (age_adjust) {
     
@@ -87,7 +92,7 @@ lvl_ord <- c("Medical", "Surgical (Emergency)", "Surgical (Elective)")
 ts_rr[, diag_grp_name := factor(diag_grp_name, levels = lvl_ord)]
 
 p1 <- ggplot(ts_rr[(diag_grp %in% 1:9 | diag_grp %in% c(11:19) | diag_grp %in% c(31:39)) & 
-              year >= intrvl[1] & year <= intrvl[2]], 
+              year >= intrvl[1] & year <= intrvl[2] & country == "Australia"], 
        aes(x = year, y = log(rr), color = diag_name)) +
   geom_line(linewidth = 0.5) + theme_bw() + geom_point() +
   xlab("Year") + ylab("log(Risk Ratio of Admission)") +

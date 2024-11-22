@@ -141,13 +141,13 @@ anz_std_diag <- function(x, split_names = FALSE) {
     return(factor(nms, levels = unique(map$grp_name)))
   } else {
     
-    nms[elect_idx] <- gsub("(Surg.)", "(Elect. Surg.)", nms[elect_idx])
-    nms[!elect_idx] <- gsub("(Surg.)", "(Emerg. Surg.)", nms[!elect_idx])
+    nms[elect_idx] <- gsub("\\(Surg.\\)", "(Elect. Surg.)", nms[elect_idx])
+    nms[!elect_idx] <- gsub("\\(Surg.\\)", "(Emerg. Surg.)", nms[!elect_idx])
     lvls <- unique(map$grp_name)
-    lvls_med <- lvls[!grepl("(Surg.)", lvls)]
-    lvls_surg <- lvls[grepl("(Surg.)", lvls)]
-    lvls <- c(lvls_med, gsub("(Surg.)", "(Emerg. Surg.)", lvls_surg),
-              gsub("(Surg.)", "(Elect. Surg.)", lvls_surg))
+    lvls_med <- lvls[!grepl("\\(Surg.\\)", lvls)]
+    lvls_surg <- lvls[grepl("\\(Surg.\\)", lvls)]
+    lvls <- c(lvls_med, gsub("\\(Surg.\\)", "(Emerg. Surg.)", lvls_surg),
+              gsub("\\(Surg.\\)", "(Elect. Surg.)", lvls_surg))
     return(factor(nms, levels = lvls))
   }
 }

@@ -3,45 +3,51 @@
 # nohup Rscript scripts/de-E-cond.R > de-E-cond.log 2>&1 &
 ricu:::init_proj()
 set.seed(2024)
-src <- "aics"
-outcome <- "readm"
-dat <- load_data(src, outcome = outcome, split_elective = TRUE)
-dat <- dat[, diag_grp := floor(apache_iii_diag / 100)]
-c(X, Z, W, Y) %<-% attr(dat, "sfm")
 
-print_sfm(X, Z, W, Y)
+src <- "aics"
+methods <- "crf" # c("osd", "crf")
+outcomes <- c("death", "readm")
 
 # new S3 implementation of conditional effects
 E_sets <- list(
-  A = c("diag_grp"),
-  B = c("age"),
-  C = c("diag_grp", "age"),
-  D = c("apache_iii_diag")
+  # A = c("diag_grp"),
+  # B = c("age"),
+  C = c("diag_grp", "age")#,
+  # D = c("apache_iii_diag")
 )
 
-# train the inference object
-for (method in c("osd", "crf")) {
+for (outcome in outcomes) {
   
-  cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
-                         method = method)
+  # load data for the target outcome
+  dat <- load_data(src, outcome = outcome, split_elective = TRUE)
+  dat <- dat[, diag_grp := floor(apache_iii_diag / 100)]
+  c(X, Z, W, Y) %<-% attr(dat, "sfm")
+  print_sfm(X, Z, W, Y)
   
-  for (i in seq_along(E_sets)) {
+  for (method in methods) {
     
-    for (minority in c(FALSE, TRUE)) {
+    # train the inference object
+    cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
+                           method = method)
+    
+    for (i in seq_along(E_sets)) {
       
-      sel_covs <- E_sets[[i]] # 
-      if (minority) sel_covs <- c(sel_covs, "majority")
-      
-      E_lst <- cmbn_E(sel_covs)
-      cde <- infer(cndE_obj, E_lst)
-      
-      # create plot title
-      ttl <- paste(c(src, outcome, method, sel_covs), collapse = "-")
-      
-      # create plot depending on dimensionality
-      E_plt <- plt_E_cnd(cde, sel_covs, ttl)
-      # save plot
-      save_plt(E_plt, paste0(ttl, ".png"), width = 5, height = 5, bg = "white")
+      for (minority in c(TRUE)) {
+        
+        sel_covs <- E_sets[[i]] # 
+        if (minority) sel_covs <- c(sel_covs, "majority")
+        
+        E_lst <- cmbn_E(sel_covs)
+        cde <- infer(cndE_obj, E_lst)
+        
+        # create plot title
+        ttl <- paste(c(src, outcome, method, sel_covs), collapse = "-")
+        
+        # create plot depending on dimensionality
+        E_plt <- plt_E_cnd(cde, sel_covs, ttl)
+        # save plot
+        save_plt(E_plt, paste0(ttl, ".png"), width = 7, height = 5, bg = "white")
+      }
     }
   }
 }

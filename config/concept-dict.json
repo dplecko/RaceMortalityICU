@@ -13,6 +13,15 @@
           "class": "col_itm",
           "callback": "anzics_hosp_epi_cb"
         }
+      ],
+      "miiv": [
+        {
+          "table": "icustays",
+          "val_var": "hadm_id",
+          "add_var": "subject_id",
+          "class": "col_itm",
+          "callback": "miiv_hosp_epi_cb"
+        }
       ]
     }
   },

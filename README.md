@@ -3,10 +3,11 @@
 In this repository you can find the code necessary to reproduce the results from the paper
 "An Algorithmic Approach for Causal Health Equity: A Look at Race Differentials in Intensive Care Unit (ICU) Outcomes".
 
-<div style="text-align: center;">
+<p align="center">
   <img src="results/iice-radar.png" width="80%" alt="Radar Chart">
-  <p style="text-align: center; font-style: italic;">Figure 1: Indigenous Intensive Care Equity (IICE) Radar.</p>
-</div>
+  <br>
+  <em>Figure 1: Indigenous Intensive Care Equity (IICE) Radar.</em>
+</p>
 
 ### Reproducing the results
 The code used for reproducing the results of the paper is contained in the `scripts/` folder. 

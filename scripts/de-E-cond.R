@@ -1,12 +1,13 @@
 
 #' Inspection of conditional direct effects.
-# nohup Rscript scripts/de-E-cond.R > de-E-cond.log 2>&1 &
+# nohup taskset -c 0-63 Rscript scripts/de-E-cond.R > de-E-cond.log 2>&1 &
 ricu:::init_proj()
 set.seed(2024)
 
-src <- "aics"
-methods <- "crf" # c("osd", "crf")
+srcs <- c("aics", "miiv")
+methods <- "crf"
 outcomes <- c("death", "readm")
+no_ttl <- TRUE
 
 # new S3 implementation of conditional effects
 E_sets <- list(
@@ -16,61 +17,44 @@ E_sets <- list(
   # D = c("apache_iii_diag")
 )
 
-for (outcome in outcomes) {
+for (src in srcs) {
   
-  # load data for the target outcome
-  dat <- load_data(src, outcome = outcome, split_elective = TRUE)
-  dat <- dat[, diag_grp := floor(apache_iii_diag / 100)]
-  c(X, Z, W, Y) %<-% attr(dat, "sfm")
-  print_sfm(X, Z, W, Y)
-  
-  for (method in methods) {
+  for (outcome in outcomes) {
     
-    # train the inference object
-    cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
-                           method = method)
+    # load data for the target outcome
+    dat <- load_data(src, outcome = outcome, split_elective = TRUE)
+    if (src != "miiv") dat <- dat[, diag_grp := floor(apache_iii_diag / 100)]
+    c(X, Z, W, Y) %<-% attr(dat, "sfm")
+    print_sfm(X, Z, W, Y)
     
-    for (i in seq_along(E_sets)) {
+    for (method in methods) {
       
-      for (minority in c(TRUE)) {
+      # train the inference object
+      cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
+                             method = method)
+      
+      for (i in seq_along(E_sets)) {
         
-        sel_covs <- E_sets[[i]] # 
-        if (minority) sel_covs <- c(sel_covs, "majority")
-        
-        E_lst <- cmbn_E(sel_covs)
-        cde <- infer(cndE_obj, E_lst)
-        
-        # create plot title
-        ttl <- paste(c(src, outcome, method, sel_covs), collapse = "-")
-        
-        # create plot depending on dimensionality
-        E_plt <- plt_E_cnd(cde, sel_covs, ttl)
-        # save plot
-        save_plt(E_plt, paste0(ttl, ".png"), width = 7, height = 5, bg = "white")
+        for (minority in c(TRUE)) {
+          
+          sel_covs <- E_sets[[i]] # 
+          if (minority) sel_covs <- c(sel_covs, "majority")
+          
+          E_lst <- cmbn_E(sel_covs, src)
+          cde <- infer(cndE_obj, E_lst)
+          
+          # create plot title
+          fl_name <- paste(c(src, outcome, method, sel_covs, no_ttl), 
+                           collapse = "-")
+          ttl <- if (src == "miiv") "United States" else "Australia"
+          if (no_ttl) ttl <- NULL
+          # create plot depending on dimensionality
+          E_plt <- plt_E_cnd(cde, sel_covs, ttl, 
+                             flip_color = (outcome == "readm"))
+          # save plot
+          save_plt(E_plt, fl_name, width = 7, height = 5, bg = "white")
+        }
       }
     }
   }
 }
-
-# concordance of residuals
-# E_lst <- cmbn_E("apache_iii_diag")
-# concord <- NULL
-# for (method in c("osd", "crf")) {
-#   
-#   cndE_obj <- cnd_effect(dat, X = X, Z = Z, W = W, Y = Y,
-#                          method = method)
-#   cde <- infer(cndE_obj, E_lst)
-#   concord <- rbind(concord, cbind(cde, method = method))
-# }
-# 
-# plt_concord <- merge(
-#   concord[method == "osd", c("effect", "apache_iii_diag")],
-#   concord[method == "crf", c("effect", "apache_iii_diag")], 
-#   by = "apache_iii_diag"
-# )
-# 
-# ggplot(plt_concord, aes(x = effect.x, y = effect.y)) +
-#   theme_bw() + xlab("OSD") + ylab("CRF") +
-#   geom_point() +
-#   geom_abline(slope = 1, intercept = 0, color = "red") +
-#   coord_cartesian(xlim = c(-0.1, 0.1))

@@ -81,6 +81,24 @@ boot_crf <- function(data, X, W, Y, nboot = 10) {
   preds
 }
 
+std_diag_idx <- function(idx, src) {
+  
+  std_idx <- rep(NA, length(idx))
+  if (src == "miiv") {
+    
+    std_idx[idx %in% 0:4] <- "Medical"
+    std_idx[idx %in% 5:15] <- "Surgical (Emergency)"
+    std_idx[idx %in% 25:35] <- "Surgical (Elective)"
+  } else if (src == "aics") {
+    
+    std_idx[idx %in% 0:11] <- "Medical"
+    std_idx[idx %in% 12:22] <- "Surgical (Emergency)"
+    std_idx[idx > 22] <- "Surgical (Elective)"
+  } else std_idx <- NULL
+  
+  std_idx
+}
+
 std_diag <- function(admg, elective = NULL) {
   
   pairs <- matrix(
@@ -152,22 +170,51 @@ anz_std_diag <- function(x, split_names = FALSE) {
   }
 }
 
-age_grp <- function(ages) {
-  labels <- c("0-4 years", "5-9 years", "10-14 years", "15-19 years", 
-              "20-24 years", 
-              "25-29 years", "30-34 years", "35-39 years", "40-44 years", 
-              "45-49 years", 
-              "50-54 years", "55-59 years", "60-64 years", "65-69 years", 
-              "70-74 years", 
-              "75-79 years", "80-84 years", "85+ years")
+age_grp <- function(ages, quart = FALSE) {
   
-  age_groups <- cut(ages, 
-                    breaks = c(-Inf, 4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 
-                               59, 64, 69, 74, 79, 84, Inf),
-                    labels = labels,
+  if (quart) {
+    
+    labels <- c("18-49", "50-64", "65-74", "75-100")
+    cuts <- c(49, 64, 74)
+  } else {
+    
+    labels <- c("0-4 years", "5-9 years", "10-14 years", "15-19 years", 
+                "20-24 years", "25-29 years", "30-34 years", "35-39 years", 
+                "40-44 years", "45-49 years", "50-54 years", "55-59 years", 
+                "60-64 years", "65-69 years", "70-74 years", "75-79 years", 
+                "80-84 years", "85+ years")
+    cuts <- c(4, 9, 14, 19, 24, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79, 84)
+  }
+  
+  age_groups <- cut(ages, breaks = c(-Inf, cuts, Inf), labels = labels,
                     right = TRUE)
   
   return(as.character(age_groups))
+}
+
+pmf_compute <- function(dat_adj, var) {
+  
+  ils_dat <- dat_adj[, .N, by = c("majority", var)]
+  ils_dat <- ils_dat[, list(pmf = N / sum(N), ils = get(var)), 
+                     by = c("majority")]
+  ils_dat <- merge(
+    as.data.table(expand.grid(majority = c(0, 1), 
+                              ils = seq(min(ils_dat$ils), max(ils_dat$ils)))),
+    ils_dat, all.x = TRUE
+  )
+  ils_dat[is.na(pmf), pmf := 0]
+  ils_dat
+}
+
+qnormmix <- function(p, value, sd) {
+  
+  k <- length(value)
+  samples <- replicate(10000, {
+    component <- sample(1:k, 1)
+    rnorm(1, mean = value[component], sd = sd[component])
+  })
+  
+  c(mean(value), lapply(p, function(pi) quantile(samples, probs = pi)))
 }
 
 local_de <- function(dat, X, Z, W, Y, nboot = 50, 
@@ -237,6 +284,18 @@ local_de <- function(dat, X, Z, W, Y, nboot = 50,
     cat("Bootstrap repetition", i, "finished\n")
   }
   
+  res
+}
+
+oval <- function(scores, x, alpha = c(0.05, 0.1, 0.5)) {
+  
+  res <- vapply(
+    alpha,
+    function(alph) ovalue:::DiT_ovalue_exact(scores[x==1], scores[x==0], alph)(
+      mean(x), "ATT"
+    ), numeric(1L)
+  )
+  names(res) <- alpha
   res
 }
 

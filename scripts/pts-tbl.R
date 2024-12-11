@@ -31,11 +31,10 @@ vars <- list(
   )
 )
 
-miss_tbl <- TRUE
-for (src in c("miiv", "anzics", "aics", "nzics")) {
+miss_tbl <- FALSE
+for (src in c("miiv", "aics")) {
   
   if (is.element(src, c("anzics", "nzics", "aics"))) {
-    
     
     tot_vars <- c(
       vars,
@@ -100,10 +99,10 @@ for (src in c("miiv", "anzics", "aics", "nzics")) {
     cohorts <- list(A = nomis, B = setdiff(tot, nomis))
   }
   
-  if (is.element(src, c("anzics", "nzics", "aics"))) src <- "anzics"
+  src_raw <- if (is.element(src, c("anzics", "nzics", "aics"))) "anzics" else "miiv"
 
-  res <- patient_table(rep(src, 2), cohorts, nms, vars, report_pvals = TRUE)
-  table_to_tex(res)
+  res <- patient_table(rep(src_raw, 2), cohorts, nms, tot_vars, report_pvals = TRUE)
+  print(table_to_tex(res))
 }
 
 

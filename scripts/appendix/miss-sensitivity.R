@@ -3,11 +3,13 @@
 #' performed, with the indigenous status imputed. The results are compared with
 #' the decomposition of the TV measure obtained on the complete dataset, with no
 #' indigenous status missingness.
+# grep 'cpu' /proc/stat | awk 'NR>1 {usage=($2+$3+$4)*100/($2+$3+$4+$5); if (usage < 10) print NR-2}'
+# nohup taskset -c 0-63 Rscript scripts/appendix/miss-sensitivity.R > miss-sens.log 2>&1 &
 ricu:::init_proj()
 
 # obtaining the TV decomposition on full data
-src <- "anzics"
-dat <- load_data(src, no_miss = FALSE)
+src <- "aics"
+dat <- load_data(src, split_elective = TRUE, no_miss = FALSE)
 c(X, Z, W, Y) %<-% attr(dat, "sfm")
 print_sfm(X, Z, W, Y)
 
@@ -46,17 +48,6 @@ mi_data <- function(dat, n_imp) {
   mi_lst
 }
 
-qnormmix <- function(p, value, sd) {
-  
-  k <- length(value)
-  samples <- replicate(10000, {
-    component <- sample(1:k, 1)
-    rnorm(1, mean = value[component], sd = sd[component])
-  })
-  
-  c(mean(value), lapply(p, function(pi) quantile(samples, probs = pi)))
-}
-
 n_imp <- 10
 mi_lst <- mi_data(dat, n_imp)
 mi_res <- NULL
@@ -75,6 +66,7 @@ for (i in seq_len(n_imp)) {
   mi_res <- rbind(mi_res, add)
 }
 
+# save(res, mi_res, file = "data/miss-sens-data.RData")
 mi_res <- as.data.table(mi_res)
 mi_res <- mi_res[, qnormmix(c(0.025, 0.975), value, sd), by = "measure"]
 mi_res <- setnames(mi_res, c("V1", "V2", "V3"), c("value", "lwr", "upr"))
@@ -86,10 +78,11 @@ plt <- rbind(cbind(res, type = "Complete Data"),
              cbind(mi_res, type = "Multiple Imputation"))
 plt <- plt[plt$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
 xlabz <- c(
-  tv = "Total Variation", ctfse = "Spurious Effect", ctfde = "Direct Effect",
-  ctfie = "Indirect Effect"
+  tv = "Total Variation", ctfse = "Confounded", ctfde = "Direct",
+  ctfie = "Indirect"
 )
 
+plt$measure <- factor(plt$measure, levels = c("ctfse", "ctfie", "ctfde", "tv"))
 ggplot(plt, aes(x = measure, y = value, fill = factor(type),
                 ymin = lwr, ymax = upr)) +
   geom_bar(position="dodge", stat = "identity", linewidth = 1.2,
@@ -115,4 +108,4 @@ ggplot(plt, aes(x = measure, y = value, fill = factor(type),
   xlab("Causal Fairness Measure") + ylab("Value") +
   scale_y_continuous(labels = scales::percent)
 
-ggsave("results/miss-sens.png", width = 8, height = 5, bg = "white")
+ggsave("results/miss-sens.png", width = 8, height = 4.5, bg = "white")

@@ -6,29 +6,31 @@
 #' (2) DE x IE, interaction of direct and indirect,
 #' (3) DE x SE, direct and spurious, (4) IE x SE, indirect and spurious,
 #' (5) DE x IE x SE, direct, indirect and spurious.
+# nohup taskset -c 0-63 Rscript scripts/interaction-testing.R > ia-pvals.log 2>&1 &
 ricu:::init_proj()
+set.seed(2024)
 target_ia <- c("TE x SE", "DE x IE", "DE x SE", "IE x SE", "DE x IE x SE")
 
-for (src in c("anzics", "miiv", "nzics", "aics")) {
+for (src in c("miiv", "nzics", "aics")) {
   
-  dat <- load_data(src)
+  dat <- load_data(src, split_elective = TRUE)
   dat[, death := as.integer(death)]
   if (is.element("country", names(dat))) 
     dat[, country := as.integer(country == "Australia")]
   c(X, Z, W, Y) %<-% attr(dat, "sfm")
+  print_sfm(X, Z, W, Y)
   
-  for (scale in c(FALSE, TRUE)) {
+  for (risk in c(FALSE, TRUE)) {
     
     # Performing interaction testing
-    res <- ia_tests(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
-                    X, Z, W, Y, log_scale = scale)
-    
-    cat("Interaction testing for", src, "with log_scale =", scale, "\n")
+    res <- one_step_debias(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
+                           X, Z, W, Y, log_risk = risk)
+    res <- as.data.table(res)
+    res[, pval := 2 * pnorm(-abs(value) / sd)]
+    cat("Interaction testing for", src, "with log_risk =", risk, "\n")
     # Computing the p-values
-    for (ia_type in target_ia) {
-      
-      pval <- 2 * pnorm(-abs(res[ia == ia_type]$psi_osd / res[ia == ia_type]$dev))
-      cat("p-value for interaction", ia_type, "=", pval, "\n")
-    }
+    for (ia_type in target_ia)
+      cat("p-value for interaction", ia_type, "=", res[measure == ia_type]$pval,
+          "\n")
   }
 }

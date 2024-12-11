@@ -13,25 +13,40 @@ cnd_effect_crf <- function(data, X, Z, W, Y) {
   src <- attr(data, "src")
   outcome <- Y
   
-  fl_path <- file.path("data", paste0("de-crf-", src, "-", outcome, ".RData"))
-  
-  if (file.exists(fl_path)) load(fl_path) else {
+  crf <- list(de = NULL, te = NULL)
+  for (effect in c("de", "te")) {
     
-    de_crf <- boot_crf(data = data, X = c(attr(dat, "sfm")$Z, attr(dat, "sfm")$W), 
-                       W = attr(dat, "sfm")$X, Y = attr(dat, "sfm")$Y)
-    save(de_crf, file = fl_path)
+    fl_path <- file.path("data", paste0(effect, "-crf-", src, "-", outcome, 
+                                        ".RData"))
+    
+    covs <- attr(dat, "sfm")$Z 
+    if (effect == "de") covs <- c(covs, attr(dat, "sfm")$W)
+    
+    if (file.exists(fl_path)) {
+      
+      crf_obj <- load(fl_path)
+      crf[[effect]] <- get(crf_obj)
+    } else {
+      
+      ce_crf <- boot_crf(data = data, X = covs, W = attr(dat, "sfm")$X, 
+                         Y = attr(dat, "sfm")$Y)
+      
+      crf[[effect]] <- ce_crf
+      save(ce_crf, file = fl_path)
+    }
   }
   
   structure(
     list(
-      de_crf = de_crf,
+      te_crf = crf[["te"]],
+      de_crf = crf[["de"]],
       data = data,
       X = X, Z = Z, W = W, Y = Y
     ), class = "crf"
   )
 }
 
-cnd_effect_osd <- function(data, X, Z, W, Y) {
+cnd_effect_osd <- function(data, X, Z, W, Y, log_risk = FALSE) {
   
   data <- as.data.frame(data)
   
@@ -42,8 +57,8 @@ cnd_effect_osd <- function(data, X, Z, W, Y) {
   K <- 10
   folds <- sample(x = rep(1:K, each = ceiling(n / K))[1:n])
   
-  eta1 <- eta2 <- list(rep(NA, nrow(data)), rep(NA, nrow(data)))
-  px_zw <- list(rep(NA, nrow(data)), rep(NA, nrow(data)))
+  eta1 <- eta2 <- ey_nest <- y_xzw <- list(rep(NA, nrow(data)), rep(NA, nrow(data)))
+  px_zw <- px_z <- list(rep(NA, nrow(data)), rep(NA, nrow(data)))
   y <- data[[Y]]
   
   for (i in seq_len(K)) {
@@ -69,6 +84,17 @@ cnd_effect_osd <- function(data, X, Z, W, Y) {
       pred_xgb(mod_y_xzw, data[val, c(X, Z, W)], intervention = 1, X = X)
     )
     
+    for (xw in c(0, 1)) {
+      
+      xy <- 1 - xw
+      y_tilde <- pred_xgb(mod_y_xzw, data[val, c(X, Z, W)],
+                          intervention = xy, X = X)
+      if (log_risk) y_tilde <- log(y_tilde)
+      mod_nested <- cv_xgb(data[val, c(X, Z)], y_tilde)
+      ey_nest[[xy+1]][tst] <- pred_xgb(mod_nested, data[tst, c(X, Z)],
+                                      intervention = xw, X = X)
+    }
+    
     # get the test set values
     px_zw_tst <- pred_xgb(mod_x_zw, data[tst, c(Z, W)])
     px_zw_tst <- list(1 - px_zw_tst, px_zw_tst)
@@ -87,7 +113,9 @@ cnd_effect_osd <- function(data, X, Z, W, Y) {
       
       eta1[[xy+1]][tst] <- (y[tst] - y_xzw_tst[[xy+1]]) / px_zw_tst[[xy+1]]
       eta2[[xy+1]][tst] <- y_xzw_tst[[xy + 1]]
-      px_zw[[xy+1]][tst] <- px_zw_tst[[xy + 1]] 
+      px_zw[[xy+1]][tst] <- px_zw_tst[[xy + 1]]
+      px_z[[xy+1]][tst] <- px_z_tst[[xy + 1]] 
+      y_xzw[[xy+1]][tst] <- y_xzw_tst[[xy + 1]]
     }
   }
   
@@ -95,15 +123,14 @@ cnd_effect_osd <- function(data, X, Z, W, Y) {
     list(
       eta1 = eta1,
       eta2 = eta2,
+      y_xzw = y_xzw,
+      ey_nest = ey_nest,
+      px_z = px_z,
       px_zw = px_zw,
       data = data,
       X = X, Z = Z, W = W, Y = Y
     ), class = "osd"
   )
-}
-
-infer <- function(object, E_lst, ...) {
-  UseMethod("infer")
 }
 
 E_to_ind <- function(E, data) {
@@ -118,57 +145,117 @@ E_to_ind <- function(E, data) {
   ind
 }
 
-infer.osd <- function(object, E_lst, ...) {
+infer <- function(object, E_lst, effect = c("DE", "IE"), ...) {
+  UseMethod("infer")
+}
+
+infer.osd <- function(object, E_lst, effect = c("DE", "IE"), ...) {
   
+  effect <- match.arg(effect, c("DE", "IE"))
   data <- object$data
+  px_z <- object$px_z
+  px_zw <- object$px_zw
+  y_xzw <- object$y_xzw
+  ey_nest <- object$ey_nest
   y <- data[[object$Y]]
   x <- data[[object$X]]
-  pso <- list(list(), list())
-  pso <- lapply(seq_along(E_lst), function(i) pso)
   
-  for (xy in c(0, 1)) {
+  if (effect == "DE") {
     
-    eta1 <- object$eta1[[xy+1]]
-    eta2 <- object$eta2[[xy+1]]
+    pso <- list(list(), list())
+    pso <- lapply(seq_along(E_lst), function(i) pso)
     
+    for (xy in c(0, 1)) {
+      
+      eta1 <- object$eta1[[xy+1]]
+      eta2 <- object$eta2[[xy+1]]
+      
+      for (ei in seq_along(E_lst)) {
+        
+        E <- E_lst[[ei]]
+        E_x <- E
+        E_x[[object$X]] <- NULL # remove the X part if needed
+        E_ind <- E_to_ind(E, data)
+        E_x_ind <- E_to_ind(E_x, data)
+        
+        xi1 <- (x == xy & E_x_ind) / mean(E_ind)
+        if (!is.null(E[[object$X]])) xi1 <- xi1 * object$px_zw[[E[[object$X]]+1]] 
+        xi2 <- E_ind / mean(E_ind)
+        
+        pso[[ei]][[xy+1]] <- xi1 * eta1 + xi2 * eta2
+      }
+    }
+    
+    res <- NULL
     for (ei in seq_along(E_lst)) {
       
+      # Y_{xy, W_{xw}} | xw - Y_{xw, W_{xw}} | xw
+      psi <- pso[[ei]][[1 + 1]] - pso[[ei]][[0 + 1]]
+      
+      rw <- data.frame(xy = 1, xw = 0, effect = mean(psi), 
+                       sd = sqrt(var(psi) / length(psi)))
+      rw$E <- list(E_lst[[ei]])
+      res <- rbind(res, rw)
+    }
+    
+    res <- cbind(res, attr(E_lst, "E_names"))
+    return(as.data.table(res))
+  } else if (effect == "IE") {
+    
+    pso <- list(list(list(), list()), list(list(), list()))
+    pso <- lapply(seq_along(E_lst), function(i) pso)
+    
+    for (xy in c(0, 1)) for (xw in c(0, 1)) for (ei in seq_along(E_lst)) {
+      
       E <- E_lst[[ei]]
+      xE <- E[[object$X]]
       E_x <- E
       E_x[[object$X]] <- NULL # remove the X part if needed
       E_ind <- E_to_ind(E, data)
       E_x_ind <- E_to_ind(E_x, data)
       
-      xi1 <- (x == xy & E_x_ind) / mean(E_ind)
-      if (!is.null(E[[object$X]])) xi1 <- xi1 * object$px_zw[[E[[object$X]]+1]] 
-      xi2 <- E_ind / mean(E_ind)
+      # get P(E | z)
+      pE_z <- px_z[[xE+1]] * E_x_ind
+      pE <- mean(E_ind)
       
-      pso[[ei]][[xy+1]] <- xi1 * eta1 + xi2 * eta2
+      # get Term T1
+      t1 <- (x == xy) / pE * pE_z / px_z[[xw+1]] * 
+        px_zw[[xw+1]] / px_zw[[xy+1]] * (y - y_xzw[[xy+1]])
+      
+      # get Term T2
+      t2 <- (x == xw) / pE * pE_z / px_z[[xw+1]] * (y_xzw[[xy+1]] - ey_nest[[xy+1]])
+      
+      # get Term T3
+      t3 <- E_ind / pE * ey_nest[[xy+1]]
+      
+      pso[[ei]][[xy+1]][[xw+1]] <- t1 + t2 + t3
     }
-  }
-  
-  res <- NULL
-  for (ei in seq_along(E_lst)) {
     
-    # Y_{xy, W_{xw}} | xw - Y_{xw, W_{xw}} | xw
-    psi <- pso[[ei]][[1 + 1]] - pso[[ei]][[0 + 1]]
+    res <- NULL
+    for (ei in seq_along(E_lst)) {
+      
+      # Y_{xy, W_{xw}} | xw - Y_{xy, W_{xw}} | xw
+      psi <- pso[[ei]][[1 + 1]][[1 + 1]] - pso[[ei]][[1 + 1]][[0 + 1]]
+      
+      rw <- data.frame(effect = mean(psi), sd = sqrt(var(psi) / length(psi)))
+      rw$E <- list(E_lst[[ei]])
+      res <- rbind(res, rw)
+    }
     
-    rw <- data.frame(xy = 1, xw = 0, effect = mean(psi), 
-                     sd = sqrt(var(psi) / length(psi)))
-    rw$E <- list(E_lst[[ei]])
-    res <- rbind(res, rw)
+    res <- cbind(res, attr(E_lst, "E_names"))
+    return(as.data.table(res))
   }
-  
-  res <- cbind(res, attr(E_lst, "E_names"))
-  as.data.table(res)
 }
 
-infer.crf <- function(object, E_lst) {
+infer.crf <- function(object, E_lst, effect = c("DE", "IE"), ...) {
   
+  effect <- match.arg(effect, c("DE", "IE"))
   data <- object$data
   de_crf <- object$de_crf
+  te_crf <- object$te_crf
   res <- NULL
   E_names <- attr(E_lst, "E_names")
+  
   for (ei in seq_along(E_lst)) {
     
     E <- E_lst[[ei]]
@@ -176,11 +263,22 @@ infer.crf <- function(object, E_lst) {
     if (sum(E_ind) > 0) {
       
       de_crf_loc <- de_crf[E_ind, , drop = FALSE]
-      effect <- mean(de_crf_loc[, 1])
-      sd <- sd(colMeans(de_crf_loc, na.rm = TRUE))
-    } else effect <- sd <- NA
-
-    rw <- data.frame(xy = 1, xw = 0, effect = effect, sd = sd)
+      te_crf_loc <- te_crf[E_ind, , drop = FALSE]
+      
+      if (effect == "DE") {
+        
+        effect_est <- mean(de_crf_loc[, 1])
+        sd <- sd(colMeans(de_crf_loc, na.rm = TRUE))
+      } else if (effect == "IE") {
+        
+        # inferring indirect effect via difference method (IE = TE - DE)
+        effect_est <- (mean(te_crf_loc[, 1]) - mean(de_crf_loc[, 1]))
+        sd <- sd(colMeans(te_crf_loc, na.rm = TRUE) - 
+                 colMeans(de_crf_loc, na.rm = TRUE))
+      }
+    } else effect_est <- sd <- NA
+    
+    rw <- data.frame(effect = effect_est, sd = sd)
     rw$E <- list(E_lst[[ei]])
     res <- rbind(res, rw)
   }
@@ -189,28 +287,27 @@ infer.crf <- function(object, E_lst) {
   as.data.table(res)
 }
 
-cmbn_E <- function(sel_covs) {
+cmbn_E <- function(sel_covs, src = "aics") {
   
-  dgs <- c(0, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 201, 
-           202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 301, 
-           303, 305, 306, 307, 308, 309, 310, 311, 312, 313, 401, 402, 403, 
-           404, 405, 406, 407, 408, 409, 410, 501, 502, 503, 504, 601, 602, 
-           603, 604, 605, 701, 702, 703, 704, 801, 802, 901, 902, 903, 1001, 
-           1002, 1101, 1102, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 
-           1209, 1210, 1211, 1212, 1213, 1301, 1302, 1303, 1304, 1401, 1403, 
-           1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1501, 
-           1502, 1503, 1504, 1505, 1506, 1601, 1602, 1603, 1604, 1605, 1701, 
-           1703, 1704, 1705, 1801, 1802, 1803, 1901, 1902, 1903, 1904, 2101, 
-           2201, 3202, 3203, 3204, 3205, 3206, 3207, 3208, 3209, 3210, 3211, 
-           3212, 3213, 3301, 3302, 3303, 3304, 3401, 3403, 3404, 3405, 3406, 
-           3407, 3408, 3409, 3410, 3411, 3412, 3413, 3501, 3502, 3503, 3504, 
-           3505, 3506, 3601, 3602, 3603, 3604, 3605, 3701, 3703, 3704, 3705, 
-           3801, 3802, 3803, 3902, 3903, 3904, 4101, 4201)
-  dgs_lst <- lapply(dgs, function(i) list(apache_iii_diag = i))
-  names(dgs_lst) <- dgs
-  
-  covs <- list(
-    diag_grp = list(
+  if (is.element(src, c("aics", "nzics", "anzics"))) {
+    
+    dgs <- c(0, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 201, 
+             202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 301, 
+             303, 305, 306, 307, 308, 309, 310, 311, 312, 313, 401, 402, 403, 
+             404, 405, 406, 407, 408, 409, 410, 501, 502, 503, 504, 601, 602, 
+             603, 604, 605, 701, 702, 703, 704, 801, 802, 901, 902, 903, 1001, 
+             1002, 1101, 1102, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 
+             1209, 1210, 1211, 1212, 1213, 1301, 1302, 1303, 1304, 1401, 1403, 
+             1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1501, 
+             1502, 1503, 1504, 1505, 1506, 1601, 1602, 1603, 1604, 1605, 1701, 
+             1703, 1704, 1705, 1801, 1802, 1803, 1901, 1902, 1903, 1904, 2101, 
+             2201, 3202, 3203, 3204, 3205, 3206, 3207, 3208, 3209, 3210, 3211, 
+             3212, 3213, 3301, 3302, 3303, 3304, 3401, 3403, 3404, 3405, 3406, 
+             3407, 3408, 3409, 3410, 3411, 3412, 3413, 3501, 3502, 3503, 3504, 
+             3505, 3506, 3601, 3602, 3603, 3604, 3605, 3701, 3703, 3704, 3705, 
+             3801, 3802, 3803, 3902, 3903, 3904, 4101, 4201)
+    dgs_lst <- lapply(dgs, function(i) list(apache_iii_diag = i))
+    diag_grp <- list(
       `Medical` = list(
         apache_iii_diag = 0:1199
       ),
@@ -220,14 +317,35 @@ cmbn_E <- function(sel_covs) {
       `Surgical (Elective)` = list(
         apache_iii_diag = 2300:4299
       )
-    ),
-    apache_iii_diag = dgs_lst,
+    )
+  } else {
+    
+    dgs <- c(0:3, 5:15, 25:35)
+    dgs_lst <- lapply(dgs, function(i) list(diag_index = i))
+    diag_grp <- list(
+      `Medical` = list(
+        diag_index = 0:3
+      ),
+      `Surgical (Emergency)` = list(
+        diag_index = 5:15
+      ),
+      `Surgical (Elective)` = list(
+        diag_index = 25:35
+      )
+    )
+  }
+  names(dgs_lst) <- dgs
+  
+  covs <- list(
+    diag_grp = diag_grp,
+    by_diag = dgs_lst,
     age = list(
-      `18-50` = list(age = 18:50), `51-66` = list(age = 51:66), 
-      `67-76` = list(age = 67:76), `77-100` = list(age = 77:100)
+      `18-49` = list(age = 18:49), `50-64` = list(age = 50:64), 
+      `65-74` = list(age = 65:74), `74-100` = list(age = 74:100)
     ),
     majority = list(minority = list(majority = 0))
   )
+  names(covs)[2] <- if (src == "miiv") "diag_index" else "apache_iii_diag"
   
   covs <- covs[sel_covs]
   
@@ -255,7 +373,7 @@ cmbn_E <- function(sel_covs) {
   E_lst
 }
 
-plt_E_cnd <- function(cde, sel_covs, ttl) {
+plt_E_cnd <- function(cde, sel_covs, ttl, flip_color = FALSE) {
   
   cov_lbl <- function(x) {
     
@@ -276,9 +394,22 @@ plt_E_cnd <- function(cde, sel_covs, ttl) {
     p <- ggplot(cde, aes(x = .data[[plt_covs]], y = effect)) +
       geom_col() + theme_bw() +
       geom_errorbar(aes(ymin = effect - 1.96 * sd, ymax = effect + 1.96 * sd)) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        axis.text = element_text(size = rel(1.1)),  # Scale axis tick labels
+        axis.title = element_text(size = rel(1.1)) # Scale axis titles
+      ) +
       ylab("DE(x0 -> x1 | E)") +
       ggtitle(ttl)
   } else {
+    
+    lwr_clr <- "blue"
+    upr_clr <- "red"
+    if (flip_color) {
+      
+      lwr_clr <- "red"
+      upr_clr <- "blue"
+    }
     
     # get 1\sigma, 2\Sigma opacity labels
     cde[, opa := ifelse(abs(effect) / sd > 2, 1, 
@@ -290,17 +421,22 @@ plt_E_cnd <- function(cde, sel_covs, ttl) {
                          fill = effect)) +
       geom_tile(aes(alpha = opa)) + 
       theme_minimal() +
-      scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                           midpoint = 0, name = "DE", labels = scales::percent) +
+      scale_fill_gradient2(low = lwr_clr, high = upr_clr, mid = "white", 
+                           midpoint = 0, name = "Direct\nEffect", labels = scales::percent) +
       geom_text(
         aes(label = paste0(round(effect * 100, 1), "%\n", "[", 
                            round((effect-1.96*sd)*100, 1), "%, ",
                            round((effect+1.96*sd)*100, 1), "%]")), 
-        color = "black", size = 3
+        color = "black", size = 4
       ) +
       ggtitle(ttl) +
       guides(
         alpha = "none"
+      ) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        axis.text = element_text(size = rel(1.1)),  # Scale axis tick labels
+        axis.title = element_text(size = rel(1.1)) # Scale axis titles
       ) +
       xlab(cov_lbl(plt_covs[1])) + ylab(cov_lbl(plt_covs[2]))
   }

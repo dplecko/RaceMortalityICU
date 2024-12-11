@@ -3,7 +3,7 @@
 #' distributions.
 ricu:::init_proj()
 
-srcs <- c("anzics", "miiv")
+srcs <- c("aics", "miiv")
 dat_lst <- lapply(
   srcs, 
   function(src) {
@@ -50,7 +50,7 @@ for (src in srcs) {
   
   dat <- load_data(src)
   dat_adj <- dat_lst[[src]]
-  if (src == "anzics") {
+  if (is.element(src, c("aics", "anzics"))) {
     
     ils_var <- "apache_iii_rod"
     ils_plt <- ggplot(
@@ -59,29 +59,19 @@ for (src in srcs) {
       geom_density(alpha = 0.5) + theme_bw()  +
       scale_fill_discrete(name = "Group", 
                           labels = c("First Nations", "Majority")) +
-      theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-            legend.box.background = element_rect(),
-            plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-            legend.title = element_text(size = 14),
-            legend.text = element_text(size = 12)) +
+      theme(
+        legend.position = "inside", legend.position.inside = c(0.7, 0.7),
+        legend.box.background = element_rect(),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
+        axis.title = element_text(size = rel(1.5)) # Scale axis titles
+      ) +
       xlab("APACHE-III Risk of Death") + ylab("Probability Density") +
-      ggtitle("Australia and New Zealand")
+      ggtitle("Australia")
     
   } else if (src == "miiv") {
-    
-    pmf_compute <- function(dat_adj, ils_var) {
-
-      ils_dat <- dat_adj[, .N, by = c("majority", ils_var)]
-      ils_dat <- ils_dat[, list(pmf = N / sum(N), ils = get(ils_var)), 
-                         by = c("majority")]
-      ils_dat <- merge(
-        as.data.table(expand.grid(majority = c(0, 1), 
-                                  ils = seq(0, max(ils_dat$ils)))),
-        ils_dat, all.x = TRUE
-      )
-      ils_dat[is.na(pmf), pmf := 0]
-      ils_dat
-    }
     
     # get p-value for sofa distributions
     pmf_dat <- pmf_compute(dat_adj, "acu_24")
@@ -98,16 +88,22 @@ for (src in srcs) {
       theme_bw() +
       scale_fill_discrete(name = "Group", 
                           labels = c("African-American", "White")) +
-      theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-            legend.box.background = element_rect(),
-            plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-            legend.title = element_text(size = 14), 
-            legend.text = element_text(size = 12)) +
+      theme(
+        legend.position = "inside", legend.position.inside = c(0.7, 0.7),
+        legend.box.background = element_rect(),
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+        legend.title = element_text(size = 14), 
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
+        axis.title = element_text(size = rel(1.5)) # Scale axis titles
+      ) +
       xlab("SOFA score at 24 hours") + ylab("Probability Mass") +
       ggtitle("United States")
   }
   
   ils_plts[[src]] <- ils_plt
+  ggsave(filename = paste0("results/ils-", src, ".png"), 
+         plot = ils_plt, bg = "white", width = 5, height = 4)
 }
 
 #' * chronic health comparison (MIMIC-IV) * 
@@ -117,21 +113,27 @@ p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf,
            color = "black", width = 1) + 
   theme_bw() +
   scale_fill_discrete(name = "Group", labels = c("African-American", "White")) +
-  theme(legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-        legend.box.background = element_rect(),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-        legend.title = element_text(size = 14),  # Adjust size of legend title
-        legend.text = element_text(size = 12)) +
+  theme(
+    legend.position = "inside", legend.position.inside = c(0.7, 0.7),
+    legend.box.background = element_rect(),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+    legend.title = element_text(size = 14),  # Adjust size of legend title
+    legend.text = element_text(size = 12),
+    axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
+    axis.title = element_text(size = rel(1.5))
+  ) +
   xlab("Charlson Comorbidity Index") + ylab("Probability Mass") +
   ggtitle("United States")
 
 ils_plts <- c(ils_plts, list(p_charlson))
+ggsave(file.path("results", "charlson-miiv.png"), width = 5, height = 4,
+       plot = p_charlson)
 cowplot::plot_grid(plotlist = ils_plts, labels = c("(A)", "(B)", "(C)"),
                    ncol = 3L)
-ggsave(file.path("results", "ils-effect.png"), width = 15, height = 4)
+ggsave(file.path("results", "ils-distr.png"), width = 15, height = 4)
 
 #' * computing the p-values *
-srcs <- c("anzics", "miiv")
+srcs <- c("aics", "miiv")
 mc_reps <- 100
 for (src in srcs) {
   

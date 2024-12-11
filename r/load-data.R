@@ -93,8 +93,23 @@ load_data <- function(src, outcome = "death",
       attr(dat, "diag_dt") <- diag_dt
     } else if (src == "miiv") {
       
-      sel_coh <- load_concepts(c("adm_episode", "age"), src, verbose = FALSE)
-      patient_ids <- id_col(sel_coh[adm_episode == 1 & age >= 18])
+      sel_coh <- load_concepts(c("adm_episode", "hosp_episode", "age", "death"), 
+                               src, verbose = FALSE)
+      
+      if (outcome == "death") {
+        
+        patient_ids <- id_col(sel_coh[adm_episode == 1 & age >= 18])
+        
+      } else if (outcome == "readm") {
+        
+        sel_coh[is.na(death), death := FALSE]
+        patient_ids <- id_col(sel_coh[adm_episode == 1 & age >= 18 & 
+                                      (death != TRUE)])
+        
+        readm <- sel_coh[, c(meta_vars(sel_coh), "hosp_episode"), with = FALSE]
+        readm[, readm := hosp_episode > 0, by = c(id_vars(readm))]
+        readm[, c("hosp_episode") := NULL]
+      }
       
       if (quick) {
         
@@ -107,6 +122,8 @@ load_data <- function(src, outcome = "death",
                                "elective", "sex", "race"), 
                              src, patient_ids = patient_ids, verbose = FALSE)
       }
+      
+      if (outcome == "readm") dat <- merge(dat, readm, all.x = TRUE)
       
       dat[, sex := as.integer(sex == "Male")]
       dat[, c(index_var(dat)) := NULL]

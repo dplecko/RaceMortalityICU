@@ -4,7 +4,7 @@
 ricu:::init_proj()
 study_flowchart <- function(src) {
   
-  if (src == "anzics") {
+  if (is.element(src, c("anzics", "aics", "nzics"))) {
     
     steps <- list(
       list(cnc = "age", fn = function(x) x < 18),
@@ -14,12 +14,14 @@ study_flowchart <- function(src) {
       list(cnc = "indig", fn = function(x) is.na(x))
     )
     
-    after_2018 <- id_col(
-      load_concepts("adm_year", "anzics", verbose = FALSE)[adm_year >= 2018]
-    )
+    cand <- load_concepts(c("adm_year", "country"), "anzics", verbose = FALSE)[adm_year >= 2018]
+    if (src == "aics") {
+      
+      cand <- cand[country == "Australia"]
+    } else if (src == "nzics") cand <- cand[country == "New Zealand"]
     
     dat <- merge(
-      id_tbl(stay_id = intersect(anzics$main$ICUStayID, after_2018)),
+      id_tbl(stay_id = intersect(anzics$main$ICUStayID, id_col(cand))),
       load_concepts(c(vapply(steps, function(x) x[["cnc"]], character(1L)), 
                       "site"), 
                     "anzics", verbose = FALSE), all.x = TRUE
@@ -65,4 +67,4 @@ study_flowchart <- function(src) {
   cat("\n")
 }
 
-study_flowchart("anzics")
+study_flowchart("aics")

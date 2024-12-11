@@ -1,5 +1,23 @@
 
-rr_compute <- function(E_cfd, dg_mod, country = c("AU", "NZ")) {
+rr_compute <- function(E_cfd, dg_mod, country = c("AU", "NZ"), 
+                       nboot = 1, rep = 1) {
+
+  if (nboot > 1) {
+    
+    ret <- do.call(
+      rbind, lapply(
+        seq_len(nboot), 
+        function(i) {
+          rri <- rr_compute(E_cfd, dg_mod, country, nboot = 1, rep = i)
+          rri[, rep := i]
+        }
+      )
+    )
+    by_vars <- setdiff(names(ret), c("country", "rep", "rr"))
+    ret <- merge(ret[rep == 1], ret[, list(sd = sd(rr)), by = by_vars], 
+                 by = by_vars)
+    return(ret[, rep := NULL])
+  }
   
   country <- match.arg(country, c("AU", "NZ"))
   
@@ -53,6 +71,8 @@ rr_compute <- function(E_cfd, dg_mod, country = c("AU", "NZ")) {
   }
   
   c(pop, adm) %<-% pop_and_dat(country, dg_mod = dg_mod)
+  
+  if (rep > 1) adm <- adm[sample(nrow(adm), replace = TRUE)]
   
   cfds <- c("age", "year")
   all <- c("diag_grp", "majority", cfds)

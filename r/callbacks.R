@@ -34,3 +34,23 @@ anzics_irsad_cb <- function(x, val_var, env, ...) {
   x[, postcode := irsad_decile]
   x
 }
+
+miiv_hosp_epi_cb <- function(x, val_var, ...) {
+  
+  epi_01 <- function(x) if (length(x) == 1) return(0) else seq_along(x)
+  
+  x <- merge(x, list(...)$env$icustays[, c("stay_id", "intime")],
+             by = "stay_id")
+  x <- as.data.table(x)
+  x <- setorderv(x, cols = c("subject_id", "intime"))
+  x[, hadm_lag := shift(hadm_id), by = c("subject_id")]
+  x[, new_hadm := (hadm_lag != hadm_id)]
+  
+  x[is.na(new_hadm), new_hadm := TRUE]
+  x[, hosp_episode := cumsum(new_hadm), by = c("subject_id")]
+  x[, max_hosp_epi := max(hosp_episode), by = c("subject_id")]
+  x[max_hosp_epi == 1, hosp_episode := 0]
+  x <- as_id_tbl(x[, c("stay_id", "hosp_episode"), with=FALSE],
+                 id_vars = "stay_id")
+  x[, c(val_var) := hosp_episode]
+}

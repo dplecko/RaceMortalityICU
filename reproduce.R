@@ -3,14 +3,15 @@ ricu:::init_proj()
 
 scripts <- c(
   "tv-decompositions.R", # Figure 2(b)
-  "spurious-age.R", # Figure 3
-  "indirect-rod.R", # Figure 4
-  "interaction-testing.R", # S4
-  "de-heterogeneity.R", # Figure 5 & D6
-  "ts-risks.R", # Figures 6
-  "age-risks.R", # Figures A2 & A3
+  "confounded-effects.R", # Figure 3(a, b)
+  "indirect-effects.R", # Figure 3(c, d, e)
+  "interaction-testing.R",
+  "de-E-cond.R", # Figure 5
+  "new-risks.R", # Figures 5, 6(a)
+  "pattern-testing.R", 
+  "iice-radar.R", # Figure
+  # Appendix figures
   "rr-testing.R", # RR values in text with confidence intervals
-  "de-residuals-and-rr.R", # Figure 7
   "overlap.R" # Figures C4 & C5
 )
 

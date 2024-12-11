@@ -7,7 +7,7 @@ srcwrap <- function(src) {
   
   switch(src,
          mimic = "MIMIC-III",
-         miiv = "MIMIC-IV",
+         miiv = "MIMIC-IV (US)",
          eicu = "eICU",
          hirid = "HiRID",
          aumc = "AUMC",
@@ -15,7 +15,7 @@ srcwrap <- function(src) {
          eicu_demo = "eICU Demo",
          anzics = "ANZICS APD",
          nzics = "ANZICS APD (New Zealand)",
-         aics = "ANZICS APD (Australia)",
+         aics = "ANZICS APD (AU)",
          sic = "SICdb",
          stop("unknown data source")
   )
@@ -29,7 +29,7 @@ print_sfm <- function(X, Z, W, Y) {
   cat("Y:", paste(Y, collapse = ", "), "\n")
 }
 
-save_plt <- function(p, name, cache = TRUE, ...) {
+save_plt <- function(p, name, cache = FALSE, ...) {
   
   folder <- "results"
   if (cache) {

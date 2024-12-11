@@ -1,96 +1,94 @@
 
+#' Analysis of overlap (+ sensitivity).
+# nohup taskset -c 64-95 Rscript scripts/appendix/overlap.R > overlap2.log 2>&1 &
 ricu:::init_proj()
 set.seed(2024)
 
-#' * Overlap analysis * 
-src <- "anzics"
-dat <- load_data(src)
-c(X, Z, W, Y) %<-% attr(dat, "sfm")
-
-# Decomposing the Disparity
-fcb <- fairness_cookbook(
-  data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing"
-)
-
-eps <- 0.001 # 0.1%
-nolap <- data.table(
-  X = fcb$pw[["px_zw"]] < eps | fcb$pw[["px_zw"]] > 1-eps,
-  W = dat$adm_diag,
-  Z = dat$age
-)
-
-nolap[, Z := age_grp(Z)]
-nolap[, W := std_diag(W)]
-
-mean_dt <- nolap[, list(mean_X = mean(X)), by = c("Z", "W")]
-mean_dt <- merge(
-  as.data.table(expand.grid(Z = unique(mean_dt$Z), W = unique(mean_dt$W), 
-                            stringsAsFactors = FALSE)),
-  mean_dt, by = c("Z", "W"), all.x = TRUE
-)
-mean_dt[is.na(mean_X), mean_X := 0]
-ggplot(mean_dt[W != "Other"], aes(x = W, y = Z, fill = trim_ends(mean_X, 0.2))) +
-  geom_tile() +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
-                       midpoint = 0, labels = scales::percent,
-                       name = "P(extreme weight)") +
-  theme_minimal() + 
-  geom_text(aes(label = paste0(round(mean_X * 100, 1), "%")), 
-            color = "black", size = 3) +
-  xlab("Diagnosis group") + ylab("Age group") +
-  theme(
-    axis.text.x = element_text(angle = 45, vjust = 0.9, hjust=1),
-    legend.title = element_text(hjust = 0.5)
-  ) +
-  geom_vline(xintercept = 4.5, color = "red")
-
-ggsave(paste0("results/overlap-", src, ".png"), width = 10, height = 7, 
-       bg = "white")
-
-# Computing the DE for age >= 65 and admission == surgery
-lde <- local_de(dat, X, Z, W, Y)
-
-# Using a Gaussian assumption
-round(100 * c(mean(lde$estimate) - 1.96 * sd(lde$estimate), 
-              mean(lde$estimate) + 1.96 * sd(lde$estimate)), 2)
-
 # sensitivity analysis for threshold impact
-eps_seq <- c(0.0001, 0.001, 0.01)
-eps_sens <- cbind(summary(fcb)$measures, eps = 0)
-for (eps in eps_seq) {
+eps_sens <- ovalues <- c()
+for (src in c("aics", "miiv")) {
   
-  fcb_eps <- fairness_cookbook(
-    data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing",
-    eps = eps
+  dat <- load_data(src, split_elective = TRUE)
+  c(X, Z, W, Y) %<-% attr(dat, "sfm")
+  print_sfm(X, Z, W, Y)
+  x <- dat$majority
+  
+  # Decomposing the Disparity
+  fcb <- fairness_cookbook(
+    data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, method = "debiasing"
   )
   
-  eps_sens <- rbind(
-    eps_sens, cbind(summary(fcb_eps)$measures, eps = eps)
+  # sensitivity over quantile-based trimming thresholds
+  scores_notrim <- fcb$pw[["px_zw"]]
+  eps_seq <- quantile(pmin(scores_notrim, 1 - scores_notrim), probs = 1:5 / 100)
+  eps_sens <- rbind(eps_sens, cbind(summary(fcb)$measures, eps = 0, quant = 0, 
+                                    src = src))
+  oval_init <- as.data.frame(t(oval(fcb$pw[["px_zw"]], x)))
+  ovalues <- rbind(
+    ovalues, 
+    cbind(oval_init, eps = 0, quant = 0, src = src)
   )
+  fcb_eps <- list()
+  for (i in seq_along(eps_seq)) {
+    
+    eps <- eps_seq[i]
+    o_idx <- which(pmin(scores_notrim, 1 - scores_notrim) > eps)
+    fcb_eps[[i]] <- fairness_cookbook(
+      data = dat[o_idx], X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
+      method = "debiasing" # , eps_trim = eps
+    )
+    
+    oval_iter <- as.data.frame(t(oval(fcb_eps[[i]]$pw[["px_zw"]], x[o_idx])))
+    ovalues <- rbind(
+      ovalues, cbind(oval_iter, eps = eps, quant = i / 100, src = src)
+    )
+    
+    eps_sens <- rbind(
+      eps_sens, 
+      cbind(summary(fcb_eps[[i]])$measures, eps = eps, quant = i / 100, src = src)
+    )
+    
+    cat("Iteration", i, "of", length(eps_seq), "finished.\n")
+  }
 }
 
+print(ovalues[, "0.05"] > ovalues[, "eps"])
+
+xlabz <- c(
+  ctfse = "Confounded", ctfie = "Indirect", ctfde = "Direct", 
+  tv = "Total Variation"
+)
+
+eps_sens <- eps_sens[eps_sens$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
+
+# change IE, SE signs of easier interpretability
 eps_sens[eps_sens$measure %in% c("ctfse", "ctfie"), ]$value <- 
-  -eps_sens[eps_sens$measure %in% c("ctfse", "ctfie"), ]$value
+  - eps_sens[eps_sens$measure %in% c("ctfse", "ctfie"), ]$value
+eps_sens$measure <- factor(eps_sens$measure, 
+                           levels = c("ctfse", "ctfie", "ctfde", "tv"))
+levels(eps_sens$measure) <- xlabz
 
-meas <- c("tv", "ctfde", "ctfse", "ctfie")
-new_meas <- c("Total Variation", "Direct", "Indirect", "Spurious")
-eps_sens <- eps_sens[eps_sens$measure %in% meas, ]
-eps_sens$measure <- new_meas[match(eps_sens$measure, meas)]
-
-ggplot(eps_sens, aes(x = factor(log(eps, 10)), y = value, group = measure)) +
+ggplot(eps_sens, aes(x = quant, y = value, group = src, 
+                     color = srcwrap(src), fill = srcwrap(src))) +
   geom_line() + geom_point() +
   geom_ribbon(aes(ymin = value - 1.96 * sd, ymax = value + 1.96 * sd),
               linewidth = 0, alpha = 0.4) +
   theme_bw() +
-  facet_wrap(~ measure) +
-  ylab("Effect Estimate") + xlab(latex2exp::TeX("$\\log_{10}(\\epsilon)$")) +
+  facet_wrap(~ measure, scales = "free_y") +
+  ylab("Effect Estimate") + xlab("Percentile Trimming Threshold") +
   theme(
     axis.text = element_text(size = 14),
     axis.title = element_text(size = 16),
-    strip.text = element_text(size = 16)
+    strip.text = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.position = "bottom"
   ) +
-  scale_y_continuous(labels = scales::percent)
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_fill_discrete(name = "Dataset") +
+  scale_color_discrete(name = "Dataset") +
+  geom_hline(yintercept = 0, color = "gray", linetype = "dashed")
 
-ggsave(paste0("results/overlap-sens-", src, ".png"), width = 11, height = 7, 
+ggsave(paste0("results/overlap-sens.png"), width = 10, height = 6,
        bg = "white")
-  

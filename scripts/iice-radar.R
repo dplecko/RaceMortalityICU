@@ -1,7 +1,7 @@
 
 ricu:::init_proj()
 
-iice_radar <- function(lvl = "SA3") {
+iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   
   age_adjust <- TRUE
   # pull in the information on patients at risk
@@ -100,15 +100,35 @@ iice_radar <- function(lvl = "SA3") {
   
   shp <- merge(shp, lvl_rr, by = lvl, all.x = TRUE)
   
+  if (grad_cts) {
+    
+    shp[, fill_var := pmin(rr, 4)]
+    grad <- scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                                 midpoint = 1, name = "Risk\nRatio")
+  } else {
+    
+    brks <- c(0.1, 0.5, 1, 2)
+    nms <- c("< 10%", "10-50%", "50-100%", "100-200%", "> 200%")
+    shp[, fill_var := cut(rr-1, breaks = c(-Inf, brks, Inf), labels = nms)]
+    shp[, fill_var := factor(fill_var, levels = rev(nms))]
+    # clrs <- c("white", "peachpuff", "tomato", "firebrick", "maroon")
+    clrs <- c("white", "#FFCCCC", "#FF6666", "red", "black")
+    # c("white", "pink", "lightcoral", "red", "darkred")
+    names(clrs) <- nms
+    grad <- scale_fill_manual(values = clrs, na.translate = FALSE,
+                              name = "Excess\nRisk Ratio")
+  }
+
   # plot the radar
   ggplot(shp) +
-    geom_sf(aes(fill = pmin(rr, 5), geometry = geometry)) +
-    # scale_fill_viridis_c() +  
-    scale_fill_gradient2(name = "Risk Ratio", low = "blue", high = "red", 
-                         mid = "white", midpoint = 1) +
+    geom_sf(aes(fill = fill_var, geometry = geometry)) +
+    grad +
     theme_minimal() +
-    labs(fill = "Risk Ratio") +
-    coord_sf(xlim = c(110, 160))
+    coord_sf(xlim = c(114, 153)) +
+    theme(
+      legend.title = element_text(hjust = 0.5) # Center the legend title
+    )
 }
 
-ggsave("results//iice-radar.png", width = 10, height = 6, bg = "white")
+ggsave("results/iice-radar.png", plot = iice_radar(),
+       width = 10, height = 6, bg = "white")

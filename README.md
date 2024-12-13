@@ -1,8 +1,4 @@
 
-``` r
-knitr::opts_chunk$set(fig.path = "images/", fig.width = 6, fig.height = 4)
-```
-
 ## An Algorithmic Approach for Causal Health Equity: A Look at Race Differentials in ICU Outcomes
 
 In this repository you can find the code necessary to reproduce the

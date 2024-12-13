@@ -3,7 +3,7 @@ output:
   github_document
 ---
 
-```{r options}
+```{r options, echo=FALSE}
 knitr::opts_chunk$set(fig.path = "images/", fig.width = 6, fig.height = 4)
 ```
 

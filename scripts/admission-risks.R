@@ -1,6 +1,7 @@
 
 #' Inspection of baseline risks of ICU admission.
 ricu:::init_proj()
+set.seed(2024)
 
 # risk stratified by year, AP3 group: E_cfd = "year", dg_mod = "apache_group"
 ts_rr <- rr_compute(c("year"), "apache_group")

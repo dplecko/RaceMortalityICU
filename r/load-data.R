@@ -3,7 +3,7 @@ load_data <- function(src, outcome = "death",
                       split_elective = FALSE, one_hot = FALSE, 
                       no_miss = TRUE, quick = FALSE) {
   
-  src <- match.arg(src, c("miiv", "anzics", "aics", "nzics"))
+  src <- match.arg(src, c("miiv", "anzics", "aics", "nzics", "mimic_demo"))
   
   root <- rprojroot::find_root(rprojroot::has_file(".gitignore"))
   fl_path <- file.path(root, "data", paste0("dat-", src, "-", outcome, ".RData"))
@@ -91,10 +91,11 @@ load_data <- function(src, outcome = "death",
       
       attr(dat, "diag_col") <- "apache_iii_diag"
       attr(dat, "diag_dt") <- diag_dt
-    } else if (src == "miiv") {
+    } else if (is.element(src, c("miiv", "mimic_demo"))) {
       
-      sel_coh <- load_concepts(c("adm_episode", "hosp_episode", "age", "death"), 
-                               src, verbose = FALSE)
+      sel_vars <- c("adm_episode", "age", "death")
+      if (src == "miiv") sel_vars <- c(sel_vars, "hosp_episode")
+      sel_coh <- load_concepts(sel_vars, src, verbose = FALSE)
       
       if (outcome == "death") {
         
@@ -102,6 +103,7 @@ load_data <- function(src, outcome = "death",
         
       } else if (outcome == "readm") {
         
+        stopifnot(src == "miiv") # no readmission for MIMIC-III demo
         sel_coh[is.na(death), death := FALSE]
         patient_ids <- id_col(sel_coh[adm_episode == 1 & age >= 18 & 
                                       (death != TRUE)])
@@ -185,12 +187,12 @@ load_data <- function(src, outcome = "death",
   if (is.element(src, c("aics", "nzics"))) sfm$Z <- setdiff(sfm$Z, "country")
   if (is.element(src, c("anzics", "nzics"))) sfm$Z <- setdiff(sfm$Z, "irsad")
   
-  if (src != "miiv" & split_elective) {
+  if (is.element(src, c("aics", "nzics", "anzics")) & split_elective) {
     
     dat[apache_iii_diag >= 1200, 
         apache_iii_diag := apache_iii_diag + 2000 * elective]
     sfm$W <- setdiff(sfm$W, "elective")
-  } else if (src == "miiv" & split_elective) {
+  } else if (is.element(src, c("miiv", "mimic_demo")) & split_elective) {
     
     dat[diag_index >= 5, diag_index := diag_index + 20 * elective]
     sfm$W <- setdiff(sfm$W, "elective")

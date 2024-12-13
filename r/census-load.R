@@ -1,65 +1,54 @@
 
 census_AU <- function() {
   
-  census_all <- read.csv("data/aus_age_overall.csv")
-  names(census_all) <- gsub("X", "", names(census_all))
-  census_all <- census_all[, c(1, 4, 3, 2)]
-  
-  census_fn <- read.csv("data/aus_age_firstnations.csv")
-  
-  # split bins to have better granularity
-  aux_data <- structure(
-    list(age = c("0-4 years", "5-9 years", "10-14 years", 
-                 "15-19 years", "20-24 years", "25-29 years", "30-34 years", 
-                 "35-39 years", "40-44 years", "45-49 years", "50-54 years", 
-                 "55-59 years", "60-64 years", "65-69 years", "70-74 years", 
-                 "75-79 years", "80-84 years", "85+ years"), 
-         people = c(105798, 109003, 111041, 95914, 86639, 78564, 66914, 
-                    57121, 49015, 50122, 47660, 40124, 32446, 22889, 15180, 8076, 
-                    4346, 2857)
-    ), 
-    class = "data.frame", row.names = c(NA, -18L)
-  )
-  
-  # Calculate proportions for splitting merged age groups
-  split_data16 <- function(original, aux) {
+  col_nms <- c("0-4 years", "5-9 years", "10-14 years", 
+               "15-19 years", "20-24 years", "25-29 years", "30-34 years", 
+               "35-39 years", "40-44 years", "45-49 years", "50-54 years", 
+               "55-59 years", "60-64 years", "65-69 years", "70-74 years", 
+               "75-79 years", "80-84 years", "85-89 years", "90-94 years",
+               "95-99 years", "100+ years")
+  pop_counts <- function(year) {
     
-    proportions <- aux$people / sum(aux$people)
-    proportions * original$X2016
+    dt <- read.csv(paste0("data/abs-data/au-counts-", year, ".csv"), 
+                   skip = 10, nrows = 8)
+    dt <- dt[-1, ]
+    names(dt) <- c("status", col_nms)
+    dt <- dt[, c("status", col_nms)]
+    dt <- melt.data.table(as.data.table(dt), id.vars = "status", 
+                          variable.factor = FALSE)
+    
+    # merge fields 85+ years
+    mrg_lvls <- c("85-89 years", "90-94 years", "95-99 years", "100+ years")
+    dt[variable %in% mrg_lvls, variable := "85+ years"]
+    dt <- dt[, list(value = sum(value)), by = c("variable", "status")]
+    
+    indig <- c("Aboriginal", "Torres Strait Islander", 
+               "Both Aboriginal and Torres Strait Islander")
+    pop <- c(indig, "Non-Indigenous", "Not stated")
+    dt[, grp := is.element(status, indig)]
+    
+    p1 <- dt[grp == TRUE, sum(value), by = c("variable", "grp")][, c("variable", "V1")]
+    dt[, grp := is.element(status, pop)]
+    p2 <- dt[grp == TRUE, sum(value), by = c("variable", "grp")][, c("variable", "V1")]
+    
+    pop <- merge(p1, p2, by = "variable")
+    pop <- setnames(pop, names(pop), c("age", "minority", "total"))
+    cbind(pop, year = year)
   }
   
-  split_data21 <- function(original, aux) {
+  ret <- list()
+  years <- c(2016, 2021)
+  for (grp in c("total", "minority")) {
     
-    proportions <- aux$people / sum(aux$people)
-    proportions * original$X2021
+    res <- lapply(years, function(year) pop_counts(year)[, c("age", grp),with=F])
+    res <- do.call(merge, res)
+    res <- setnames(res, names(res), c("age", years))
+    res <- as.data.frame(res)
+    res <- res[c(1, 10, 2:9, 11:18), ] # reorder columns manually
+    ret[[grp]] <- res 
   }
   
-  # Apply proportions to split merged age groups
-  census_fnc <- data.frame(
-    age = c("0-4 years", "5-9 years", "10-14 years", "15-19 years", "20-24 years", 
-            "25-29 years", "30-34 years", "35-39 years", "40-44 years", "45-49 years", 
-            "50-54 years", "55-59 years", "60-64 years", "65-69 years", "70-74 years", 
-            "75-79 years", "80-84 years", "85+ years"),
-    `2016` = c(census_fn$X2016[1],
-               split_data16(census_fn[2, ], aux_data[2:3, ]),
-               split_data16(census_fn[3, ], aux_data[4:5, ]),
-               split_data16(census_fn[4, ], aux_data[6:7, ]),
-               split_data16(census_fn[5, ], aux_data[8:9, ]),
-               split_data16(census_fn[6, ], aux_data[10:11, ]),
-               split_data16(census_fn[7, ], aux_data[12:13, ]),
-               split_data16(census_fn[8, ], aux_data[14:18, ])),
-    `2021` = c(census_fn$X2021[1],
-               split_data21(census_fn[2, ], aux_data[2:3, ]),
-               split_data21(census_fn[3, ], aux_data[4:5, ]),
-               split_data21(census_fn[4, ], aux_data[6:7, ]),
-               split_data21(census_fn[5, ], aux_data[8:9, ]),
-               split_data21(census_fn[6, ], aux_data[10:11, ]),
-               split_data21(census_fn[7, ], aux_data[12:13, ]),
-               split_data21(census_fn[8, ], aux_data[14:18, ]))
-  )
-  names(census_fnc) <- c("age", "2016", "2021")
-  
-  list(total = census_all, minority = census_fnc)
+  ret
 }
 
 census_NZ <- function() {

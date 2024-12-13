@@ -10,7 +10,7 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   # pull in the data on patients admitted
   dat <- pop_and_dat("AU")[["dat"]]
   dat <- dat[year == 2021]
-  poa_dat <- load_concepts("postcode", "anzics")
+  poa_dat <- load_concepts("postcode", "anzics", verbose = FALSE)
   dat <- merge(dat, poa_dat, all.x = TRUE)
   
   # pull in the data on merging areas
@@ -88,7 +88,7 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   ts_rr[is.nan(rr), rr := NA]
   
   # load the shape file for lvl
-  folder <- file.path(ricu::data_dir(), "raw", "anzics-2024")
+  folder <- "data/abs-data"
   shp <- sf::st_read(file.path(folder, paste0(tolower(lvl), "-shp"), 
                                paste0(tolower(lvl), "-shp.shp")))
   shp <- as.data.table(shp)

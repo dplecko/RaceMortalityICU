@@ -2,7 +2,7 @@
 build_tables <- function(lvl = "SA3", ret = c("tbls", "qual")) {
   
   ret <- match.arg(ret, c("tbls", "qual"))
-  fl <- paste0(tolower(lvl), "-level.csv")
+  fl <- paste0(tolower(lvl), "-counts.csv")
   raw_data <- readr::read_lines(file.path("data/abs-data", fl))
   
   grps <- c("\" Non-Indigenous", "\" Aboriginal\"", "\" Torres Strait Islander\"",
@@ -50,8 +50,7 @@ build_tables <- function(lvl = "SA3", ret = c("tbls", "qual")) {
     cnt_lst[[i]] <- dt
   }
   
-  #' * perform quality control (!) *
-  # browser()
+  #' * perform quality control *
   if (ret == "qual") {
     
     qual <- c()
@@ -76,7 +75,7 @@ build_tables <- function(lvl = "SA3", ret = c("tbls", "qual")) {
 
 area_map <- function() {
   
-  folder <- file.path(ricu::data_dir(), "raw", "anzics-2024")
+  folder <- "data/abs-data"
   if (file.exists("data/area-map.RData")) {
     
     load(file.path("data/area-map.RData"))
@@ -125,15 +124,15 @@ at_risk <- function(lvl = "SA3") {
   }
   
   maj <- cbind(
-    tbls[["non-indig"]][, c(1), with = FALSE],
-    tbls[["non-indig"]][, -c(1, 2)] + tbls[["unknown"]][, -c(1, 2)]
+    tbls[["non-indig"]][, c(1), with = FALSE], # SA column
+    tbls[["non-indig"]][, -c(1, 2)] + tbls[["unknown"]][, -c(1, 2)] # counts
   )
   maj$majority <- 1
   
   min <- cbind(
-    tbls[["non-indig"]][, c(1), with = FALSE],
+    tbls[["non-indig"]][, c(1), with = FALSE], # SA column
     tbls[["aborigin"]][, -c(1, 2)] + tbls[["torres"]][, -c(1, 2)] + 
-      tbls[["both"]][, -c(1, 2)]
+      tbls[["both"]][, -c(1, 2)] # counts for Indigenous
   )
   min$majority <- 0
   

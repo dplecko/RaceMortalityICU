@@ -15,7 +15,10 @@ Outcomes”.
 
 ### Installation Instructions
 
-For installing the required dependencies, use the following code.
+For installing the required dependencies, use the following code. The
+expected installation time is within few minutes. R version 4.3.0 or
+higher is recommended. The dependencies are compatible with Linux,
+MacOS, and Windows distributions.
 
 ``` r
 # remotes package used for installing dependencies from Github
@@ -75,8 +78,9 @@ if (all(pkg_inst)) {
 ### Analysis Demo
 
 A demo analysis can be run immediately after successful installation of
-the above dependencies. For reproducing full results, please see
-information about full data setup below.
+the above dependencies. The runtime of the demo analysis should be under
+1 minute. For reproducing full results, please see information about
+full data setup below.
 
 ``` r
 ricu:::init_proj()
@@ -160,6 +164,24 @@ ggplot(res, aes(x = measure, y = value,
 
 <img src="images/demo-analysis-1.png" style="display: block; margin: auto;" />
 
+### Using the Shiny App
+
+The data can also be analyzed using the Shiny App located in the
+`shiny-app` folder. For starting the app, install `shiny` and simply
+run:
+
+``` r
+shiny::runApp("shiny-app")
+```
+
+To save the demo data to a csv file before running the analysis, you can
+use:
+
+``` r
+write.csv(load_data("mimic_demo")[, -c("icustay_id", "diag_index")], 
+          file = "shiny-app/mimic-iii-demo.csv", row.names = FALSE)
+```
+
 ------------------------------------------------------------------------
 
 ### Reproducing the results
@@ -167,8 +189,8 @@ ggplot(res, aes(x = measure, y = value,
 The code used for reproducing the results of the paper is contained in
 the `scripts/` folder. The script `reproduce.R` can be used to run the
 analyses. In the below tables, we point to the files used to generate
-the respective figures. Prior to running the code, install any necessary
-dependencies appearing in `r/zzz-deps.R`.
+the respective figures. Within each specific files, code comments are
+included that explain the logic of the analyses step-by-step.
 
 ##### Main text:
 
@@ -247,8 +269,8 @@ on the baseline risks of ICU admission.
     POA](https://www.abs.gov.au/statistics/people/people-and-communities/socio-economic-indexes-areas-seifa-australia/2021/Postal%20Area%2C%20Indexes%2C%20SEIFA%202021.xlsx)).
     This file should be placed in `data/abs-data/poa-seifa.xlsx`.
 4.  Population counts across for Statistical Areas 3. This data needs to
-    be extracted manually from the \[ABS TableBuilder
-    Pro\]((<https://www.abs.gov.au/statistics/microdata-tablebuilder/tablebuilder>).
+    be extracted manually from the [ABS TableBuilder
+    Pro](https://www.abs.gov.au/statistics/microdata-tablebuilder/tablebuilder).
     Upon obtaining login for TableBuilder Pro, select
     `2021 Census - counting persons, place of enumeration`. In
     `Age and Sex` dropdown menu, choose variable `AGE5P` and assign it

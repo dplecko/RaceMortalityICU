@@ -1,0 +1,98 @@
+#tv-decomposition {
+    margin-top: -60px;
+}
+#sfm-clustering-container {
+    margin-top: -80px;
+}
+.drag-area {
+  border: 1px solid #000;
+  text-align: center;
+  position: absolute;
+  z-index: 1;
+}
+.arrow {
+  position: absolute;
+  pointer-events: none; /* Prevent interaction with the arrows */
+  stroke: black; /* Ensure arrows are black */
+}
+#area-1 { /* Z confounders */
+  width: 250px;
+  height: 100px;
+  top: 20px;
+  left: 100px;
+}
+#area-2 { /* X protected attribute */
+  width: 100px;
+  height: 80px;
+  top: 175px;
+  left: -10px;
+}
+#area-3 { /* W mediators */
+  width: 250px;
+  height: 100px;
+  top: 320px;
+  left: 100px;
+}
+#area-4 { /* Y outcome */
+  width: 100px;
+  height: 80px;
+  top: 175px;
+  left: 370px;
+}
+.draggable-block {
+  min-width: 10px; /* Default minimum width */
+  max-width: 100px; /* Maximum width to prevent excessive expansion */
+  width: auto; /* Allow auto-expansion based on content */
+  padding: 0 10px; /* Add padding for content spacing */
+  height: 20px;
+  border: 1px solid #000;
+  text-align: center;
+  display: flex; /* Flexbox for vertical centering */
+  align-items: center; /* Center text vertically */
+  justify-content: center; /* Center text horizontally */
+  margin-bottom: 10px;
+  background-color: #e0e0e0; /* Lighter shade of gray */
+  cursor: move;
+  z-index: 2;
+}
+.label {
+  position: absolute;
+  text-align: center;
+  font-weight: bold;
+  width: 100%;
+  background-color: #d3d3d3; /* Updated background color */
+  color: black; /* Updated text color */
+}
+#label-1 {
+  top: 5px;
+  left: 100px;
+  width: 250px;
+}
+#label-2 {
+  top: 160px;
+  left: -10px;
+  width: 100px;
+}
+#label-3 {
+  top: 305px;
+  left: 100px;
+  width: 250px;
+}
+#label-4 {
+  top: 160px;
+  left: 370px;
+  width: 100px;
+}
+.arrow {
+  position: absolute;
+  stroke: black;
+  stroke-width: 2;
+  fill: none;
+  z-index: 0;
+}
+#main-container {
+  position: relative;
+  height: 500px;
+  width: 450px;
+  margin: auto;
+}

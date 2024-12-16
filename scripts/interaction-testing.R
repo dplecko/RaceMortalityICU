@@ -9,26 +9,34 @@
 # nohup taskset -c 0-63 Rscript scripts/interaction-testing.R > ia-pvals.log 2>&1 &
 ricu:::init_proj()
 set.seed(2024)
+
+# specify all the target interactions
 target_ia <- c("TE x SE", "DE x IE", "DE x SE", "IE x SE", "DE x IE x SE")
 
-for (src in c("miiv", "nzics", "aics")) {
+# choose MIMIC-IV and ANZICS APD data sources
+for (src in c("miiv", "aics")) {
   
+  # load the data from the target source
   dat <- load_data(src, split_elective = TRUE)
   dat[, death := as.integer(death)]
-  if (is.element("country", names(dat))) 
-    dat[, country := as.integer(country == "Australia")]
+  
+  # print the Standard Fairness Model information
   c(X, Z, W, Y) %<-% attr(dat, "sfm")
   print_sfm(X, Z, W, Y)
   
   for (risk in c(FALSE, TRUE)) {
     
-    # Performing interaction testing
+    cat("Interaction testing for", src, "with log_risk =", risk, "\n")
+    
+    # perform interaction testing
     res <- one_step_debias(as.data.frame(dat[, c(X, Z, W, Y), with = FALSE]), 
                            X, Z, W, Y, log_risk = risk)
     res <- as.data.table(res)
+    
+    # compute the p-values
     res[, pval := 2 * pnorm(-abs(value) / sd)]
-    cat("Interaction testing for", src, "with log_risk =", risk, "\n")
-    # Computing the p-values
+    
+    # print the p-values
     for (ia_type in target_ia)
       cat("p-value for interaction", ia_type, "=", res[measure == ia_type]$pval,
           "\n")

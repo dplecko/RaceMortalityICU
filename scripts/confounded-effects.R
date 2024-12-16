@@ -1,18 +1,19 @@
 
 ricu:::init_proj()
 
+# helper function for loading age and minority status
 age_dat <- function(src) load_data(src)[, c("age", "majority"), with=FALSE]
 
-# Data and settings list
+# specify datasets and legend labels
 dat_lst <- list(
   list(src = "miiv", title = "United States", labels = c("African-American", "White")),
   list(src = "aics", title = "Australia", labels = c("First Nations", "Majority"))
 )
 
-# Initialize an empty list to store the plots
+# initialize an empty list to store the plots
 plots <- list()
 
-# Loop to create plots
+# create plots for each data source
 for (i in seq_along(dat_lst)) {
   
   dat <- dat_lst[[i]] 
@@ -38,7 +39,11 @@ for (i in seq_along(dat_lst)) {
          plot = plots[[i]], bg = "white", width = 6, height = 4)
 }
 
+# compute the probability mass function (pmf) for the Index of Relative 
+# Socioeconomic Advantage and Disadvantage (IRSAD) on the ANZICS APD
 ses <- pmf_compute(load_data("aics"), "irsad")
+
+# plot the distribution of IRSAD across groups
 ggplot(ses, aes(x = ils, y = pmf, fill = factor(majority))) +
   geom_bar(stat = "identity", position = "identity", alpha = 0.5, 
            color = "black", width = 1) + 

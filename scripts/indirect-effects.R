@@ -3,12 +3,15 @@
 #' distributions.
 ricu:::init_proj()
 
+# specify the target sources
 srcs <- c("aics", "miiv")
 dat_lst <- lapply(
   srcs, 
   function(src) {
     dat <- load_data(src)
     dat[, age := round(age)]
+    
+    # set the number of Monte Carlo samples to 1 million
     n_mc <- 10^6
     
     # pre-compute age look-ups
@@ -44,7 +47,7 @@ dat_lst <- lapply(
 )
 names(dat_lst) <- srcs
 
-#' * comparison of illness severity *
+# comparison of illness severity
 ils_plts <- list()
 for (src in srcs) {
   
@@ -52,7 +55,10 @@ for (src in srcs) {
   dat_adj <- dat_lst[[src]]
   if (is.element(src, c("aics", "anzics"))) {
     
+    # use APACHE-III risk of death for illness severity on ANZICS APD
     ils_var <- "apache_iii_rod"
+    
+    # plot APACHE-III distribution across groups
     ils_plt <- ggplot(
       dat_adj, aes(x = .data[[ils_var]], fill = factor(majority))
     ) +
@@ -73,14 +79,12 @@ for (src in srcs) {
     
   } else if (src == "miiv") {
     
-    # get p-value for sofa distributions
-    pmf_dat <- pmf_compute(dat_adj, "acu_24")
-    pmf_dat[, maj := majority]
-    pmf_dat[, size := nrow(dat[majority == maj]), by = c("ils", "maj")]
-    pmf_dat[, obs_counts := round(pmf * size)]
-    # print(chisq.test(x = cbind(pmf_dat[majority == 1]$obs_counts, 
-    #                            pmf_dat[majority == 0]$obs_counts)))
+    # use SOFA score for illness severity on MIMIC-IV data
     
+    # compute the probability mass function of the SOFA score distribution at 24h
+    pmf_dat <- pmf_compute(dat_adj, "acu_24")
+    
+    # plot SOFA at 24 hours distribution across groups
     ils_plt <- ggplot(pmf_dat, 
                       aes(x = ils, y = pmf, fill = factor(majority))) +
       geom_bar(stat = "identity", position = "identity", alpha = 0.5, 
@@ -106,7 +110,7 @@ for (src in srcs) {
          plot = ils_plt, bg = "white", width = 5, height = 4)
 }
 
-#' * chronic health comparison (MIMIC-IV) * 
+# chronic health comparison (MIMIC-IV)
 p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf, 
                                              fill = factor(majority))) +
   geom_bar(stat = "identity", position = "identity", alpha = 0.5, 
@@ -125,14 +129,10 @@ p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf,
   xlab("Charlson Comorbidity Index") + ylab("Probability Mass") +
   ggtitle("United States")
 
-ils_plts <- c(ils_plts, list(p_charlson))
 ggsave(file.path("results", "charlson-miiv.png"), width = 5, height = 4,
        plot = p_charlson)
-cowplot::plot_grid(plotlist = ils_plts, labels = c("(A)", "(B)", "(C)"),
-                   ncol = 3L)
-ggsave(file.path("results", "ils-distr.png"), width = 15, height = 4)
 
-#' * computing the p-values *
+# compute the p-values for mean differences
 srcs <- c("aics", "miiv")
 mc_reps <- 100
 for (src in srcs) {
@@ -179,8 +179,6 @@ for (src in srcs) {
     
     if (src == "miiv")
       mean_tst <- rbind(mean_tst, mc_dat[, mean(acu_24), by = "majority"])
-    # pval <- c(pval, wilcox.test(x = mc_dat[majority == 1]$acu_24, 
-    #                             mc_dat[majority == 0]$acu_24)$p.value)
   }
   
   if (src == "miiv") {

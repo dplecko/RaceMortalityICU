@@ -1,23 +1,30 @@
 
 ricu:::init_proj()
 
+# functionality for constructing the IICE Radar
 iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   
+  # adjust the report risk by age
   age_adjust <- TRUE
+  
   # pull in the information on patients at risk
   pop_dat <- at_risk(lvl)
   
   # pull in the data on patients admitted
   dat <- pop_and_dat("AU")[["dat"]]
+  
+  # focus on year 2021, which matches the collection year of the census data
   dat <- dat[year == 2021]
+  
+  # load and merge in information on postal area of patients
   poa_dat <- load_concepts("postcode", "anzics", verbose = FALSE)
   dat <- merge(dat, poa_dat, all.x = TRUE)
   
-  # pull in the data on merging areas
+  # pull in the data on for merging Statistical Areas that share postal codes
   crs <- sa_coarsening(area_map(), "postcode", lvl)
   crs$area <- seq_len(nrow(crs))
   
-  # get the area indicator to both pop_dat and dat
+  # create mapping from Statistical Areas to merged areas
   poa_area <- do.call(
     rbind, Map(
       function(x, y) data.table(postcode = x, area = y),
@@ -25,6 +32,7 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
     )
   )
   
+  # create the mapping from postal areas to merged areas
   lvl_area <- do.call(
     rbind, Map(
       function(x, y) data.table(lvl = x, area = y),
@@ -33,35 +41,33 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   )
   setnames(lvl_area, "lvl", lvl)
   
-  # merge areas into pop_dat, dat
+  # merge ares information into population data and ICU patient data
   pop_dat <- merge(pop_dat, lvl_area, by = lvl)
   dat <- merge(dat, poa_area, by = "postcode", all.x = TRUE)
   
-  if (sum(is.na(dat$area)) > 0) {
-    
-    cat("Some areas not mapped. Check.\n")
-    dat <- dat[complete.cases(dat)]
-  }
+  dat <- dat[complete.cases(dat)]
 
-  # get risks by age group -> exists
-  # get age-adjusted risk ratio -> exists
+  # prepare table for computing risk ratios for ICU admission
   ts_risk <- as.data.table(
-    expand.grid(age = unique(dat$age), # diag_grp = unique(dat$diag_grp),
-                majority = c(0, 1), area = unique(dat$area))
+    expand.grid(age = unique(dat$age), majority = c(0, 1), area = unique(dat$area))
   )
   
+  # merge in admission counts for ICU patient data
   ts_risk <- merge(
     ts_risk, dat[, .N, by = c("age", "majority", "area")],
     all.x = TRUE
   )
+  
+  # categories with no admissions set to 0
   ts_risk[is.na(N), N := 0]
   
-  # risk by area
+  # compute the risks of admission by area
   ts_risk <- merge(
     ts_risk, pop_dat[, sum(value), by = c("age", "majority", "area")], 
     by = c("age", "majority", "area"), all.x = TRUE
   )
   
+  # adjust by age if necessary
   if (age_adjust) {
     
     wgh_dat <- pop_dat[, list(N = sum(value)), by = c("age", "area")][, list(age = age, wgh = N/sum(N)),
@@ -73,21 +79,25 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
     ts_risk <- ts_risk[, list(risk = sum(risk * wgh) / sum(wgh)), 
                        by = c("area", "majority")] 
   } else {
-    # pooled estimate
+
     ts_risk <- ts_risk[, list(risk = sum(N) / sum(V1)), 
                        by = c("area", "majority")]
   }
   
+  # merge the risks for majority and minority groups
   ts_rr <- merge(
     ts_risk[majority == 0, c("area", "risk"), with=FALSE],
     ts_risk[majority == 1, c("area", "risk"), with=FALSE],
     by = c("area")
   )
   
+  # compute the risk ratio
   ts_rr[, rr := risk.x / risk.y]
+  
+  # if the risk is 0 for the majority group, set the risk ratio to NA
   ts_rr[is.nan(rr), rr := NA]
   
-  # load the shape file for lvl
+  # load the shape file for statistical areas
   folder <- "data/abs-data"
   shp <- sf::st_read(file.path(folder, paste0(tolower(lvl), "-shp"), 
                                paste0(tolower(lvl), "-shp.shp")))
@@ -96,10 +106,13 @@ iice_radar <- function(lvl = "SA3", grad_cts = FALSE) {
   shp <- shp[!grepl("ZZ", get(lvl))]
   shp[[lvl]] <- as.numeric(shp[[lvl]])
   
+  # merge area information with risk ratios
   lvl_rr <- merge(lvl_area, ts_rr[, c("area", "rr"), with=FALSE], by = "area")
   
+  # merge full information with the shape file
   shp <- merge(shp, lvl_rr, by = lvl, all.x = TRUE)
   
+  # choose type of gradient for coloring the areas in IICE Radar
   if (grad_cts) {
     
     shp[, fill_var := pmin(rr, 4)]

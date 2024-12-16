@@ -8,21 +8,27 @@ set.seed(2024)
 res <- c()
 for (src in c("miiv", "aics")) {
   
+  # load data from the required source
   dat <- load_data(src, split_elective = TRUE)
+  
+  # print information on the Standard Fairness Model that is used
   cat("Decomposing TV on", srcwrap(src), "with SFM\n")
   c(X, Z, W, Y) %<-% attr(dat, "sfm")
   print_sfm(X, Z, W, Y)
   
+  # decompose the TV measure using the faircause package
   fcb <- fairness_cookbook(
     data = dat, X = X, Z = Z, W = W, Y = Y, x0 = 0, x1 = 1, 
     method = "debiasing"
   )
   
+  # save the measures of direct, indirect, and spurious effect
   res <- rbind(
     res, cbind(summary(fcb)$measures, Dataset = srcwrap(src))
   )
 }
 
+# specify labels for the plot
 xlabz <- c(
   tv = "Total Variation", ctfde = "Direct",
   ctfie = "Indirect", ctfse = "Confounded"
@@ -34,6 +40,8 @@ res <- res[res$measure %in% c("tv", "ctfde", "ctfse", "ctfie"), ]
 res[res$measure %in% c("ctfse", "ctfie"), ]$value <- 
   - res[res$measure %in% c("ctfse", "ctfie"), ]$value
 res$measure <- factor(res$measure, levels = c("ctfse", "ctfie", "ctfde", "tv"))
+
+# visualize the TV decompositions for MIMIC-IV and ANZICS APD
 ggplot(res, aes(x = measure, y = value, fill = Dataset,
                 ymin = value - 1.96 * sd, ymax = value + 1.96 * sd)) +
   geom_bar(position="dodge", stat = "identity", linewidth = 1.2,

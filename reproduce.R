@@ -7,12 +7,14 @@ scripts <- c(
   "indirect-effects.R", # Figure 3(c, d, e)
   "interaction-testing.R",
   "de-E-cond.R", # Figure 5
-  "new-risks.R", # Figures 5, 6(a)
+  "admission-risks.R", # Figures 5, 6(a)
   "pattern-testing.R", 
-  "iice-radar.R", # Figure
+  "iice-radar.R", # Figure 7
   # Appendix figures
-  "rr-testing.R", # RR values in text with confidence intervals
-  "overlap.R" # Figures C4 & C5
+  "appendix/study-flowchart.R", # Figure A1
+  "appendix/overlap.R", # Figure C2
+  "appendix/ie-E-cond.R", # Figure D3
+  "appendix/miss-sensitivity.R" # Figure E4
 )
 
 for (file in scripts) {

@@ -6,6 +6,7 @@ study_flowchart <- function(src) {
   
   if (is.element(src, c("anzics", "aics", "nzics"))) {
     
+    # specify filtering steps for ANZICS APD
     steps <- list(
       list(cnc = "age", fn = function(x) x < 18),
       list(cnc = "sex", fn = function(x) is.na(x)),
@@ -28,6 +29,7 @@ study_flowchart <- function(src) {
     )
   } else if (src == "miiv") {
     
+    # specify filtering steps for MIMIC-IV
     steps <- list(
       list(cnc = "age", fn = function(x) x < 18),
       list(cnc = "sex", fn = function(x) is.na(x)),
@@ -44,17 +46,22 @@ study_flowchart <- function(src) {
     )
   }
   
+  # print the initial number of patients in the cohort
   cat("Starting with", nrow(dat), "admissions from", 
       length(unique(dat$site)), "\n")
   for (i in seq_along(steps)) {
     
     ndat <- dat[!steps[[i]][["fn"]](get(steps[[i]][["cnc"]]))]
+    
+    # print the number of removed patients in each step
     cat("Removing", nrow(dat) - nrow(ndat), "admissions based on",
         steps[[i]][["cnc"]], "\n")
     dat <- ndat
   }
   
+  # print the final cohort size
   cat("Ending with", nrow(dat), "admissions")
+  
   if (src == "anzics") {
     
     dat <- merge(dat, load_concepts("country", "anzics"), all.x = TRUE)
@@ -67,4 +74,6 @@ study_flowchart <- function(src) {
   cat("\n")
 }
 
+# get flowcharts for ANZICS APD and MIMIC-IV
 study_flowchart("aics")
+study_flowchart("miiv")

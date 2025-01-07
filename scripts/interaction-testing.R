@@ -1,5 +1,4 @@
 
-
 #' Performing interaction testing, to investigate interactions of different
 #' causal pathways (direct, indirect, spurious). In total, 5 interactions are 
 #' tested: (1) TE x SE, for the interaction of total (causal) and spurious paths,

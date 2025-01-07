@@ -54,3 +54,16 @@ miiv_hosp_epi_cb <- function(x, val_var, ...) {
                  id_vars = "stay_id")
   x[, c(val_var) := hosp_episode]
 }
+
+anzics_diab_cb <- function(x, ...) {
+  
+  x[, DIABETES := DIABETES != 5]
+  x
+}
+
+anzics_cmb_cb <- function(interval, ...) {
+  
+  cmb <- Reduce(merge, list(...))
+  cmb[, anz_cmb := rowSums(cmb[, -1])]
+  cmb[, c(id_vars(cmb), "anz_cmb"), with=FALSE]
+}

@@ -61,3 +61,14 @@ ggplot(age_adm_rr, aes(x = diag_grp, y = age_quart, fill = rr)) +
   )
 
 ggsave("results/age-diag-risks.png", width = 7, height = 5, bg = "white")
+
+# compute risks stratified by age admission type
+
+adm_rr <- rr_compute(NULL, "adm_type", nboot = 10)
+ggplot(adm_rr, aes(x = diag_grp, y = rr)) +
+  geom_col() + 
+  geom_errorbar(aes(ymin = rr - 1.96 * sd, ymax = rr + 1.96 * sd),
+                width = 0.5) +
+  theme_bw() +
+  xlab("Diagnosis group") +
+  ylab("Risk ratio")

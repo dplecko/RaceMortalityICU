@@ -17,6 +17,20 @@ no_ttl <- TRUE
 # specify events for computing conditional direct effects
 E_sets <- list(C = c("diag_grp", "age"))
 
+# create folds if they are not already there
+for (src in srcs) {
+  
+  success <- tryCatch({
+    config(src)
+    TRUE
+  }, error = function(e) FALSE)
+  
+  if (!success) {
+
+    create_folds(src)
+  }
+}
+
 for (src in srcs) {
   
   for (outcome in outcomes) {

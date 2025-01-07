@@ -35,7 +35,7 @@ load_data <- function(src, outcome = "death",
       
       dat <- load_concepts(c("death", "age", "country", "apache_iii_rod", 
                              "apache_iii_diag", "sex", "indig", "elective", 
-                             "adm_diag", "irsad"), "anzics", 
+                             "frailty", "anz_cmb", "adm_diag", "irsad"), "anzics", 
                            patient_ids = patient_ids, verbose = FALSE)
       
       if (outcome == "readm") {
@@ -52,14 +52,18 @@ load_data <- function(src, outcome = "death",
       imp_lst <- list(
         age = 65,
         apache_iii_rod = median(dat$apache_iii_rod, na.rm = TRUE),
-        irsad = median(dat$irsad, na.rm = TRUE),
+        irsad = -1, # median(dat$irsad, na.rm = TRUE)
         death = FALSE,
         apache_iii_diag = 0,
         majority = NA,
         elective = NA,
         sex = NA,
-        adm_diag = "OTH"
+        adm_diag = "OTH",
+        anz_cmb = 0
       )
+      
+      # frailty imputation breaks
+      frl_brk <- c(-Inf, 17.99, 39.99, 74.99, 88.99, 96.99, Inf)
       
       for (i in seq_len(ncol(dat))) {
         
@@ -67,6 +71,9 @@ load_data <- function(src, outcome = "death",
         if (any(is.na(dat[[var]])) & !is.null(imp_lst[[var]]))
           dat[is.na(get(var)), c(var) := imp_lst[[var]]]
       }
+      
+      # impute frailty by age
+      dat[is.na(frailty), frailty := .bincode(age, breaks = frl_brk)]
       
       # subset to Australia or New Zealand accordingly
       if (src == "aics") {
@@ -86,7 +93,8 @@ load_data <- function(src, outcome = "death",
       diag_dt[, diag_group := floor(apache_iii_diag / 100)]
       
       sfm <- list(X = "majority", Z = c("age", "sex", "country", "irsad"),
-                  W = c("apache_iii_diag", "elective", "apache_iii_rod"),
+                  W = c("anz_cmb", "frailty", "apache_iii_diag", "elective", 
+                        "apache_iii_rod"),
                   Y = outcome)
       
       attr(dat, "diag_col") <- "apache_iii_diag"

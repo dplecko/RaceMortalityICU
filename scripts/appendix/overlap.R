@@ -26,7 +26,7 @@ for (src in c("aics", "miiv")) {
   )
   
   # obtain the propensity weights
-  scores_notrim <- fcb$pw[["px_zw"]]
+  scores_notrim <- fcb$pw[["px_zw"]][[2]]
   
   # define quantiles of the propensity weights across which trimming is performed
   eps_seq <- quantile(pmin(scores_notrim, 1 - scores_notrim), probs = 1:5 / 100)
@@ -36,7 +36,7 @@ for (src in c("aics", "miiv")) {
                                     src = src))
   
   # compute O-values for untrimemed data
-  oval_init <- as.data.frame(t(oval(fcb$pw[["px_zw"]], x)))
+  oval_init <- as.data.frame(t(oval(fcb$pw[["px_zw"]][[2]], x)))
   ovalues <- rbind(
     ovalues, 
     cbind(oval_init, eps = 0, quant = 0, src = src)
@@ -61,7 +61,7 @@ for (src in c("aics", "miiv")) {
     )
     
     # compute O-values on the trimmed dataset
-    oval_iter <- as.data.frame(t(oval(fcb_eps[[i]]$pw[["px_zw"]], x[o_idx])))
+    oval_iter <- as.data.frame(t(oval(fcb_eps[[i]]$pw[["px_zw"]][[2]], x[o_idx])))
     ovalues <- rbind(
       ovalues, cbind(oval_iter, eps = eps, quant = i / 100, src = src)
     )

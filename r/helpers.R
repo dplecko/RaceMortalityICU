@@ -6,44 +6,7 @@ trim_ends <- function(x, eps) {
   x
 }
 
-cv_xgboost <- function(data, X, W, Y, nboot = 50) {
-  
-  n <- nrow(data)
-  preds0 <- preds1 <- matrix(NA, nrow = n, ncol = nboot)
-  
-  for (i in seq_len(nboot)) {
-    set.seed(i)
-    in_bag <- sample(1:n, size = round(0.8 * n))
-    out_bag <- setdiff(1:n, in_bag)
-    
-    dtrain <- xgb.DMatrix(data = as.matrix(data[in_bag, c(X, W), with = FALSE]), 
-                          label = data[in_bag][[Y]])
-    dtest <- xgb.DMatrix(data = as.matrix(data[out_bag, c(X, W), with = FALSE]))
-    
-    # create intervened data
-    data0 <- data1 <- copy(data)
-    data0[[W]] <- 0
-    data1[[W]] <- 1
-    
-    dtest0 <- xgb.DMatrix(data = as.matrix(data0[out_bag, c(X, W), with = FALSE]))
-    dtest1 <- xgb.DMatrix(data = as.matrix(data1[out_bag, c(X, W), with = FALSE]))
-    
-    cv <- xgb.cv(params = list(eta = 0.1, objective = "binary:logistic"),
-                 data = dtrain, nrounds = 200, nfold = 5, 
-                 early_stopping_rounds = 10, verbose = 0)
-    
-    bst <- xgb.train(params = list(eta = 0.1, objective = "binary:logistic"),
-                     data = dtrain, nround = cv$best_iteration)
-    
-    preds0[out_bag, i] <- predict(bst, dtest0)
-    preds1[out_bag, i] <- predict(bst, dtest1)
-  }
-  
-  # return(list(preds0, preds1))
-  rowMeans(preds1, na.rm = TRUE) - rowMeans(preds0, na.rm = TRUE)
-}
-
-boot_crf <- function(data, X, W, Y, nboot = 10) {
+boot_crf <- function(src, data, X, W, Y, nboot = 10) {
   
   data_path <- tempfile(fileext = ".csv")
   fwrite(data, data_path)
@@ -59,8 +22,8 @@ boot_crf <- function(data, X, W, Y, nboot = 10) {
     
     # Build the system call to run the worker script
     cmd <- sprintf(
-      "Rscript scripts/boot-crf.R %d %s '%s' %s %s %s",
-      i, data_path, paste(X, collapse = ","), W, Y, output_path
+      "Rscript scripts/boot-crf.R %d %s %s '%s' %s %s %s",
+      i, src, data_path, paste(X, collapse = ","), W, Y, output_path
     )
     
     # Run the worker script
@@ -297,6 +260,65 @@ oval <- function(scores, x, alpha = c(0.05, 0.1, 0.5)) {
   )
   names(res) <- alpha
   res
+}
+
+mc_dataset <- function(dat, n_mc = list(10^6, 10^6)) {
+  
+  dat[, age := round(age)]
+  
+  # pre-compute age look-ups
+  lookup <- replicate(17, NULL)
+  for (i in seq(range(dat$age)[1], range(dat$age)[2])) {
+    
+    lookup[[i]] <- list(NULL)
+    lookup[[i]][[1]] <- which(dat$age == i & dat$majority == 0)
+    lookup[[i]][[2]] <- which(dat$age == i & dat$majority == 1)
+  }
+  
+  if (max(dat$age) == 100) {
+    
+    if (length(lookup[[100]][[1]]) == 0) 
+      lookup[[100]][[1]] <- lookup[[99]][[1]]
+    
+    if (length(lookup[[98]][[1]]) == 0) 
+      lookup[[98]][[1]] <- lookup[[99]][[1]]
+  }
+  
+  ret <- c()
+  for (maj in c(0, 1)) {
+    
+    # sample age distribution
+    if (maj == 0 || n_mc[[1]] != n_mc[[2]])
+      ag <- sample(dat$age, n_mc[[maj + 1]], replace = TRUE)
+    
+    rows <- lapply(
+      unique(ag),
+      function(agi) {
+        
+        n_samp <- sum(ag == agi)
+        sample(x = lookup[[agi]][[maj + 1]], n_samp, replace = TRUE)
+      }
+    )
+    
+    ret <- if (maj == 0) dat[do.call(c, rows)] else rbind(ret, dat[do.call(c, rows)])
+  }
+  
+  ret
+}
+
+create_folds <- function(src, nfolds = 10) {
+  
+  pids <- id_col(load_data(src))
+  folds <- lapply(
+    seq_len(nfolds),
+    function(i) {
+      
+      if (i == 1) return(pids)
+      sample(pids, replace = TRUE)
+    }
+  )
+  
+  config(src, value = folds)
 }
 
 Sys.setenv(N_CORES = parallel::detectCores()) # set to 64 for the cluster

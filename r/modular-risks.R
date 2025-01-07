@@ -20,6 +20,7 @@ rr_compute <- function(E_cfd, dg_mod, country = c("AU", "NZ"),
   }
   
   country <- match.arg(country, c("AU", "NZ"))
+  src <- if (country == "AU") "aics" else "nzics"
   
   cfd_E <- function(sel_covs = NULL) {
     
@@ -72,7 +73,11 @@ rr_compute <- function(E_cfd, dg_mod, country = c("AU", "NZ"),
   
   c(pop, adm) %<-% pop_and_dat(country, dg_mod = dg_mod)
   
-  if (rep > 1) adm <- adm[sample(nrow(adm), replace = TRUE)]
+  if (rep <= 10) {
+    
+    b_idx <- match(config(src)[[rep]], id_col(adm))
+    adm <- adm[b_idx]
+  } else adm <- adm[sample(nrow(adm), replace = TRUE)]
   
   cfds <- c("age", "year")
   all <- c("diag_grp", "majority", cfds)

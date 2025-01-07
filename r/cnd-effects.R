@@ -1,14 +1,14 @@
 
-cnd_effect <- function(data, X, Z, W, Y, method = c("osd", "crf")) {
+cnd_effect <- function(data, X, Z, W, Y, method = c("osd", "crf"), ...) {
   
   method <- match.arg(method, c("osd", "crf"))
   switch (method,
     osd = cnd_effect_osd(data, X, Z, W, Y),
-    crf = cnd_effect_crf(data, X, Z, W, Y)
+    crf = cnd_effect_crf(data, X, Z, W, Y, ...)
   )
 }
 
-cnd_effect_crf <- function(data, X, Z, W, Y) {
+cnd_effect_crf <- function(data, X, Z, W, Y, subfolder = NULL) {
   
   src <- attr(data, "src")
   outcome <- Y
@@ -16,11 +16,12 @@ cnd_effect_crf <- function(data, X, Z, W, Y) {
   crf <- list(de = NULL, te = NULL)
   for (effect in c("de", "te")) {
     
-    fl_path <- file.path("data", paste0(effect, "-crf-", src, "-", outcome, 
-                                        ".RData"))
+    fl_nm <- paste0(effect, "-crf-", src, "-", outcome, ".RData")
+    if (!is.null(subfolder)) fl_nm <- file.path(subfolder, fl_nm)
+    fl_path <- file.path("data", fl_nm)
     
-    covs <- attr(dat, "sfm")$Z 
-    if (effect == "de") covs <- c(covs, attr(dat, "sfm")$W)
+    covs <- attr(data, "sfm")$Z 
+    if (effect == "de") covs <- c(covs, attr(data, "sfm")$W)
     
     if (file.exists(fl_path)) {
       
@@ -28,8 +29,8 @@ cnd_effect_crf <- function(data, X, Z, W, Y) {
       crf[[effect]] <- get(crf_obj)
     } else {
       
-      ce_crf <- boot_crf(data = data, X = covs, W = attr(dat, "sfm")$X, 
-                         Y = attr(dat, "sfm")$Y)
+      ce_crf <- boot_crf(src = src, data = data, X = covs, W = attr(data, "sfm")$X, 
+                         Y = attr(data, "sfm")$Y)
       
       crf[[effect]] <- ce_crf
       save(ce_crf, file = fl_path)
@@ -247,7 +248,7 @@ infer.osd <- function(object, E_lst, effect = c("DE", "IE"), ...) {
   }
 }
 
-infer.crf <- function(object, E_lst, effect = c("DE", "IE"), ...) {
+infer.crf <- function(object, E_lst, effect = c("DE", "IE"), rep = NULL, ...) {
   
   effect <- match.arg(effect, c("DE", "IE"))
   data <- object$data
@@ -267,14 +268,28 @@ infer.crf <- function(object, E_lst, effect = c("DE", "IE"), ...) {
       
       if (effect == "DE") {
         
-        effect_est <- mean(de_crf_loc[, 1])
-        sd <- sd(colMeans(de_crf_loc, na.rm = TRUE))
+        if (is.null(rep)) {
+          
+          effect_est <- mean(de_crf_loc[, 1])
+          sd <- sd(colMeans(de_crf_loc, na.rm = TRUE))
+        } else {
+          
+          effect_est <- mean(de_crf_loc[, rep])
+          sd <- NA
+        }
       } else if (effect == "IE") {
         
         # inferring indirect effect via difference method (IE = TE - DE)
-        effect_est <- (mean(te_crf_loc[, 1]) - mean(de_crf_loc[, 1]))
-        sd <- sd(colMeans(te_crf_loc, na.rm = TRUE) - 
-                 colMeans(de_crf_loc, na.rm = TRUE))
+        if (is.null(rep)) {
+          
+          effect_est <- (mean(te_crf_loc[, 1]) - mean(de_crf_loc[, 1]))
+          sd <- sd(colMeans(te_crf_loc, na.rm = TRUE) - 
+                     colMeans(de_crf_loc, na.rm = TRUE))
+        } else {
+          
+          effect_est <- (mean(te_crf_loc[, rep]) - mean(de_crf_loc[, rep]))
+          sd <- NA
+        }
       }
     } else effect_est <- sd <- NA
     
@@ -345,6 +360,7 @@ cmbn_E <- function(sel_covs, src = "aics") {
     ),
     majority = list(minority = list(majority = 0))
   )
+  
   names(covs)[2] <- if (src == "miiv") "diag_index" else "apache_iii_diag"
   
   covs <- covs[sel_covs]

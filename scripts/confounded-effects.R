@@ -7,7 +7,7 @@ age_dat <- function(src) load_data(src)[, c("age", "majority"), with=FALSE]
 # specify datasets and legend labels
 dat_lst <- list(
   list(src = "miiv", title = "United States", labels = c("African-American", "White")),
-  list(src = "aics", title = "Australia", labels = c("First Nations", "Majority"))
+  list(src = "aics", title = "Australia", labels = c("Indigenous", "Non-Indigenous"))
 )
 
 # initialize an empty list to store the plots
@@ -26,9 +26,11 @@ for (i in seq_along(dat_lst)) {
     scale_fill_discrete(name = "Group", labels = dat$labels) +
     scale_y_continuous(breaks = c(0, 0.01, 0.02)) +
      theme(
-      legend.position = "inside", legend.position.inside = c(0.2, 0.8),
+      legend.position = "inside", legend.position.inside = c(0.18, 0.85),
       legend.box.background = element_rect(),
       plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+      legend.title = element_text(size = 14),  # Adjust size of legend title
+      legend.text = element_text(size = 12),
       axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
       axis.title = element_text(size = rel(1.5)) # Scale axis titles
     ) +
@@ -41,7 +43,7 @@ for (i in seq_along(dat_lst)) {
 
 # compute the probability mass function (pmf) for the Index of Relative 
 # Socioeconomic Advantage and Disadvantage (IRSAD) on the ANZICS APD
-ses <- pmf_compute(load_data("aics"), "irsad")
+ses <- pmf_compute(load_data("aics")[irsad > 0], "irsad")
 
 # plot the distribution of IRSAD across groups
 ggplot(ses, aes(x = ils, y = pmf, fill = factor(majority))) +
@@ -49,11 +51,13 @@ ggplot(ses, aes(x = ils, y = pmf, fill = factor(majority))) +
            color = "black", width = 1) + 
   theme_bw() +
   scale_fill_discrete(name = "Group", 
-                      labels = c("First Nations", "Majority")) +
+                      labels = c("Indigenous", "Non-Indigenous")) +
   theme(
     legend.position = "inside", legend.position.inside = c(0.7, 0.8),
     legend.box.background = element_rect(),
     plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+    legend.title = element_text(size = 14),  # Adjust size of legend title
+    legend.text = element_text(size = 12),
     axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
     axis.title = element_text(size = rel(1.5)) # Scale axis titles
   ) +

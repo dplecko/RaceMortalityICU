@@ -1,7 +1,10 @@
 
 normalize_matrix <- function(mat, method = "zscore") {
   
-  if (method == "zscore") {
+  if (method == "none") {
+    
+    return(mat)
+  } else if (method == "zscore") {
     
     return((mat - mean(mat)) / sd(mat))
   } else if (method == "minmax") {

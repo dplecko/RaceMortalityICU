@@ -2,17 +2,20 @@
 # Load necessary libraries
 library(grf)
 library(data.table)
+library(assertthat)
+invisible(source("r/utils-config.R"))
 
 #' * Heterogeneity of (z, w)-DE_{x_0, x_1} * 
 
 # Retrieve command-line arguments
 args <- commandArgs(trailingOnly = TRUE)
 i <- as.integer(args[1])
-data_path <- args[2]
-X <- unlist(strsplit(args[3], ","))
-W <- args[4]
-Y <- args[5]
-output_path <- args[6]
+src <- args[2]
+data_path <- args[3]
+X <- unlist(strsplit(args[4], ","))
+W <- args[5]
+Y <- args[6]
+output_path <- args[7]
 
 # Load data
 dat <- fread(data_path)
@@ -22,8 +25,12 @@ set.seed(i)
 
 # Perform bootstrap iteration
 n <- nrow(dat)
-in_bag <- sample(1:n, size = n, replace = TRUE)
-out_bag <- setdiff(1:n, in_bag)
+if (i <= 10) {
+  
+  in_bag <- match(config(src)[[i]], dat[[1]])
+  in_bag <- in_bag[!is.na(in_bag)]
+} else in_bag <- sample(seq_len(n), size = n, replace = TRUE)
+out_bag <- setdiff(seq_len(n), in_bag)
 
 crf <- causal_forest(
   X = as.matrix(dat[in_bag, X, with = FALSE]),
@@ -31,10 +38,13 @@ crf <- causal_forest(
   num.threads = 64
 )
 
-# out-of-bag
-preds <- predict(
-  crf, as.matrix(dat[out_bag, X, with = FALSE])
-)$predictions
+# out-of-bag predictions (if any sample out-of-bag exists)
+if (length(out_bag) > 0) {
+  
+  preds <- predict(
+    crf, as.matrix(dat[out_bag, X, with = FALSE])
+  )$predictions
+} else preds <- NULL
 
 # in-bag oob predictions
 preds <- c(preds, crf$predictions[, 1])

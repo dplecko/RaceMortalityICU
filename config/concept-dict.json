@@ -49,5 +49,120 @@
         }
       ]
     }
+  },
+  "diab": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "DIABETES",
+          "class": "col_itm",
+          "callback": "anzics_diab_cb"
+        }
+      ]
+    }
+  },
+  "sofa_anz": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "sofa_score_derived",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "aids": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "AIDS",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "hep_fail": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "HEPFAIL",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "lymphoma": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "LYMPHOMA",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "leuk_or_mye": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "LEUKAEM",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "metast": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "METAST",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "immunosup": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "IMMUNSUP",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "cirrhosis": {
+    "target": "id_tbl",
+    "sources": {
+      "anzics": [
+        {
+          "table": "main",
+          "val_var": "CIRRHOS",
+          "class": "col_itm"
+        }
+      ]
+    }
+  },
+  "anz_cmb": {
+    "class": "rec_cncpt",
+    "target": "id_tbl",
+    "concepts": ["aids", "hep_fail", "lymphoma", "metast", "leuk_or_mye", "immunosup", "cirrhosis"],
+    "callback": "anzics_cmb_cb"
   }
 }

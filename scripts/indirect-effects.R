@@ -2,50 +2,23 @@
 #' Investigating indirect effects: illness severity and chronic health 
 #' distributions.
 ricu:::init_proj()
+set.seed(2024)
 
 # specify the target sources
 srcs <- c("aics", "miiv")
-dat_lst <- lapply(
-  srcs, 
-  function(src) {
-    dat <- load_data(src)
-    dat[, age := round(age)]
-    
-    # set the number of Monte Carlo samples to 1 million
-    n_mc <- 10^6
-    
-    # pre-compute age look-ups
-    lookup <- replicate(17, NULL)
-    for (i in seq(range(dat$age)[1], range(dat$age)[2])) {
-      
-      lookup[[i]] <- list(NULL)
-      lookup[[i]][[1]] <- which(dat$age == i & dat$majority == 0)
-      lookup[[i]][[2]] <- which(dat$age == i & dat$majority == 1)
-    }
-    
-    rows <- lapply(
-      seq_len(n_mc),
-      function(i) {
-        
-        ag <- sample(dat$age, 1)
-        s_maj <- sample(lookup[[ag]][[2]], 1)
-        
-        if (ag == 98) {
-          
-          s_min <- sample(lookup[[ag+1]][[1]], 1)
-        } else if (ag == 100) {
-          
-          s_min <- lookup[[100]][[1]][1]
-        } else s_min <- sample(lookup[[ag]][[1]], 1)
-        
-        c(s_min, s_maj)
-      }
-    )
-    rows <- do.call(rbind, rows)
-    rbind(dat[rows[, 1]], dat[rows[, 2]])  
-  }
-)
+dat_lst <- lapply(srcs, function(src) mc_dataset(load_data(src)))
 names(dat_lst) <- srcs
+
+# specify plotting theme settings
+theme_block <- theme(
+  legend.position = "inside", legend.position.inside = c(0.7, 0.7),
+  legend.box.background = element_rect(),
+  plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
+  legend.title = element_text(size = 14),  # Adjust size of legend title
+  legend.text = element_text(size = 12),
+  axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
+  axis.title = element_text(size = rel(1.5))
+)
 
 # comparison of illness severity
 ils_plts <- list()
@@ -53,7 +26,9 @@ for (src in srcs) {
   
   dat <- load_data(src)
   dat_adj <- dat_lst[[src]]
-  if (is.element(src, c("aics", "anzics"))) {
+  
+  anz_sofa <- TRUE
+  if (is.element(src, c("aics", "anzics")) & !anz_sofa) {
     
     # use APACHE-III risk of death for illness severity on ANZICS APD
     ils_var <- "apache_iii_rod"
@@ -64,25 +39,31 @@ for (src in srcs) {
     ) +
       geom_density(alpha = 0.5) + theme_bw()  +
       scale_fill_discrete(name = "Group", 
-                          labels = c("First Nations", "Majority")) +
-      theme(
-        legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-        legend.box.background = element_rect(),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-        legend.title = element_text(size = 14),
-        legend.text = element_text(size = 12),
-        axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
-        axis.title = element_text(size = rel(1.5)) # Scale axis titles
-      ) +
+                          labels = c("Indigenous", "Non-Indigenous")) +
+      theme_block +
       xlab("APACHE-III Risk of Death") + ylab("Probability Density") +
       ggtitle("Australia")
     
-  } else if (src == "miiv") {
+  } else {
     
-    # use SOFA score for illness severity on MIMIC-IV data
-    
+    # use SOFA score for illness severity
+    if (is.element(src, c("aics", "anzics"))) {
+      
+      sofa <- load_concepts("sofa_anz", "anzics")
+      dat <- merge(dat, sofa, all.x = TRUE)
+      dat_adj <- merge(dat_adj, sofa, all.x = TRUE)
+      ils_var <- "sofa_anz"
+      country <- "Australia"
+      labs <- c("Indigenous", "Non-Indigenous")
+    } else {
+      
+      ils_var <- "acu_24"
+      country <- "United States"
+      labs <- c("African-American", "White")
+    }
+
     # compute the probability mass function of the SOFA score distribution at 24h
-    pmf_dat <- pmf_compute(dat_adj, "acu_24")
+    pmf_dat <- pmf_compute(dat_adj, ils_var)
     
     # plot SOFA at 24 hours distribution across groups
     ils_plt <- ggplot(pmf_dat, 
@@ -90,19 +71,10 @@ for (src in srcs) {
       geom_bar(stat = "identity", position = "identity", alpha = 0.5, 
                color = "black", width = 1) + 
       theme_bw() +
-      scale_fill_discrete(name = "Group", 
-                          labels = c("African-American", "White")) +
-      theme(
-        legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-        legend.box.background = element_rect(),
-        plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-        legend.title = element_text(size = 14), 
-        legend.text = element_text(size = 12),
-        axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
-        axis.title = element_text(size = rel(1.5)) # Scale axis titles
-      ) +
-      xlab("SOFA score at 24 hours") + ylab("Probability Mass") +
-      ggtitle("United States")
+      scale_fill_discrete(name = "Group", labels = labs) +
+      theme_block +
+      xlab("SOFA score on ICU day one") + ylab("Probability Mass") +
+      ggtitle(country)
   }
   
   ils_plts[[src]] <- ils_plt
@@ -117,15 +89,7 @@ p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf,
            color = "black", width = 1) + 
   theme_bw() +
   scale_fill_discrete(name = "Group", labels = c("African-American", "White")) +
-  theme(
-    legend.position = "inside", legend.position.inside = c(0.7, 0.7),
-    legend.box.background = element_rect(),
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
-    legend.title = element_text(size = 14),  # Adjust size of legend title
-    legend.text = element_text(size = 12),
-    axis.text = element_text(size = rel(1.5)),  # Scale axis tick labels
-    axis.title = element_text(size = rel(1.5))
-  ) +
+  theme_block +
   xlab("Charlson Comorbidity Index") + ylab("Probability Mass") +
   ggtitle("United States")
 
@@ -133,58 +97,30 @@ ggsave(file.path("results", "charlson-miiv.png"), width = 5, height = 4,
        plot = p_charlson)
 
 # compute the p-values for mean differences
-srcs <- c("aics", "miiv")
+srcs <- c("miiv", "aics")
 mc_reps <- 100
 for (src in srcs) {
   
+  ils_var <- if (src == "aics") "sofa_anz" else "acu_24"
   dat <- load_data(src)
   dat[, age := round(age)]
   
-  # pre-compute age look-ups
-  lookup <- replicate(17, NULL)
-  for (i in seq(range(dat$age)[1], range(dat$age)[2])) {
-    
-    lookup[[i]] <- list(NULL)
-    lookup[[i]][[1]] <- which(dat$age == i & dat$majority == 0)
-    lookup[[i]][[2]] <- which(dat$age == i & dat$majority == 1)
-  }
+  if (src == "aics")
+    dat <- merge(dat, load_concepts("sofa_anz", "anzics"), all.x = TRUE)
   
   pval <- mean_tst <- c()
   for (rep in seq_len(mc_reps)) {
     
-    mc_dat <- c() 
-    for (lvl in c(0, 1)) {
-      
-      n_mc <- nrow(dat[majority == lvl])
-      rows <- lapply(
-        seq_len(n_mc),
-        function(i) {
-          
-          ag <- sample(dat$age, 1)
-          if (lvl == 1) return(sample(lookup[[ag]][[2]], 1))
-          
-          if (ag == 98) {
-            
-            s_min <- sample(lookup[[ag+1]][[1]], 1)
-          } else if (ag == 100) {
-            
-            s_min <- lookup[[100]][[1]][1]
-          } else s_min <- sample(lookup[[ag]][[1]], 1)
-          
-          return(s_min)
-        }
-      )
-      mc_dat <- if (lvl == 0) dat[unlist(rows)] else rbind(mc_dat, dat[unlist(rows)])
-    }
+    cat("MC iteration \r", rep)
     
-    if (src == "miiv")
-      mean_tst <- rbind(mean_tst, mc_dat[, mean(acu_24), by = "majority"])
+    mc_dat <- mc_dataset(dat, n_mc = list(sum(dat$majority == 0), 
+                                          sum(dat$majority == 1)))
+    mean_tst <- rbind(mean_tst, mc_dat[, mean(get(ils_var)), by = "majority"])
   }
+  cat("\n")
   
-  if (src == "miiv") {
-    
-    mean_vals <- data.table(A = mean_tst[majority==1]$V1, 
-                            B = mean_tst[majority==0]$V1)
-    print(mean_vals[, list(pvalue = 2 * min(mean(A < B), mean(A >= B)))])
-  }
+  mean_vals <- data.table(A = mean_tst[majority==1]$V1, 
+                          B = mean_tst[majority==0]$V1)
+  cat(src, "\n")
+  print(mean_vals[, list(pvalue = 2 * min(mean(A < B), mean(A >= B)))])
 }

@@ -68,14 +68,14 @@ p1 <- ggplot(cie, aes(x = age, y = effect, color = srcwrap(src),
   xlab("Age group (years)") +
   scale_color_discrete(name = "Dataset") +
   scale_fill_discrete(name = "Dataset") +
-  theme(legend.position = "inside",
-        legend.position.inside = c(0.63, 0.92),
+  theme(legend.position = "bottom",
+        # legend.position.inside = c(0.2, 0.2),
         legend.box.background = element_rect(),
-        legend.direction = "horizontal",
+        # legend.direction = "horizontal",
         axis.text = element_text(size = rel(1.2)),  # Scale axis tick labels
         axis.title = element_text(size = rel(1.2)))
 
-ggsave(paste0("results/ie-E-cond.png"), plot = p1, width = 6, height = 3.5)
+ggsave(paste0("results/ie-E-cond.png"), plot = p1, width = 6, height = 4)
 
 # X to W effect inspection
 p_xtow <- ggplot(xtow_dat, aes(x = age_bin, y = V1, fill = factor(majority))) +

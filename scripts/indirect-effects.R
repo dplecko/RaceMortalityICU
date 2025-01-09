@@ -79,7 +79,7 @@ for (src in srcs) {
   
   ils_plts[[src]] <- ils_plt
   ggsave(filename = paste0("results/ils-", src, ".png"), 
-         plot = ils_plt, bg = "white", width = 5, height = 4)
+         plot = ils_plt, bg = "white", width = 6, height = 4)
 }
 
 # chronic health comparison (MIMIC-IV)
@@ -93,7 +93,7 @@ p_charlson <- ggplot(pmf_compute(dat_adj, "charlson"), aes(x = ils, y = pmf,
   xlab("Charlson Comorbidity Index") + ylab("Probability Mass") +
   ggtitle("United States")
 
-ggsave(file.path("results", "charlson-miiv.png"), width = 5, height = 4,
+ggsave(file.path("results", "charlson-miiv.png"), width = 6, height = 4,
        plot = p_charlson)
 
 # compute the p-values for mean differences

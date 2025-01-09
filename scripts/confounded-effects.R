@@ -20,13 +20,13 @@ for (i in seq_along(dat_lst)) {
   dat$data <- age_dat(dat[["src"]])
   cat("Mean age difference", diff(dat$data[, mean(age), by = "majority"]$V1), "\n")
   plots[[i]] <- ggplot(dat$data, aes(x = age, fill = factor(majority))) +
-    theme_minimal() +
+    theme_bw() +
     ylab("Probability Density") +
     xlab("Age") +
     scale_fill_discrete(name = "Group", labels = dat$labels) +
     scale_y_continuous(breaks = c(0, 0.01, 0.02)) +
      theme(
-      legend.position = "inside", legend.position.inside = c(0.18, 0.85),
+      legend.position = "inside", legend.position.inside = c(0.18, 0.825),
       legend.box.background = element_rect(),
       plot.title = element_text(hjust = 0.5, face = "bold", size = 18),
       legend.title = element_text(size = 14),  # Adjust size of legend title
